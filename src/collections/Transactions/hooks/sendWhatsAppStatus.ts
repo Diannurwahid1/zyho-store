@@ -1,4 +1,4 @@
-import { notifyPaidOrder } from '@/lib/commerceWhatsApp'
+import { getWhatsAppFailureMeta, notifyPaidOrder } from '@/lib/commerceWhatsApp'
 import type { CollectionAfterChangeHook } from 'payload'
 
 export const sendTransactionWhatsAppAfterChange: CollectionAfterChangeHook = async ({
@@ -24,10 +24,11 @@ export const sendTransactionWhatsAppAfterChange: CollectionAfterChangeHook = asy
   })
     .then((result) => {
       if (!result?.success) {
+        const failure = getWhatsAppFailureMeta(result)
         req.payload.logger.error(
           {
-            error: result?.error || result?.reason || 'Unknown WhatsApp failure',
-            recipient: result?.recipient,
+            error: failure.error,
+            recipient: failure.recipient,
             transactionID: doc.id,
           },
           '[WhatsApp] Transaction success notification failed',

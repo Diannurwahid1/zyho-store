@@ -14,7 +14,7 @@ import type { Coupon } from '@/payload-types'
 import type { Address } from '@/payload-types'
 import { assertCurrencyEnabled } from '@/utilities/currencySettings'
 import { assertOwnedActiveCheckoutSession } from '@/lib/checkoutSessionServer'
-import type { PayloadRequest } from 'payload'
+import type { CollectionSlug, PayloadRequest } from 'payload'
 
 type PreparedPaymentContext = {
   amount: number
@@ -43,7 +43,7 @@ export const findFinalizedPayment = async ({
   field: string
   paymentReference: string
   req: PayloadRequest
-  transactionsSlug: string
+  transactionsSlug: CollectionSlug
 }) => {
   if (!paymentReference) return null
   const existing = await req.payload.find({
@@ -286,14 +286,14 @@ export const finalizePaidOrder = async ({
   customerID?: number | string | null
   discountAmount: number
   eligibleVoucher: Coupon | null
-  ordersSlug: string
+  ordersSlug: CollectionSlug
   paymentGroupData?: Record<string, unknown>
   paymentMethod: string
   paymentReference: string
   req: PayloadRequest
   shippingAddress?: Partial<Address>
   subtotalBeforeDiscount: number
-  transactionsSlug: string
+  transactionsSlug: CollectionSlug
 }) => {
   const pointsEarned =
     currencyCode === 'IDR'
@@ -322,10 +322,11 @@ export const finalizePaidOrder = async ({
   }
 
   const order = await req.payload.create({
-    collection: ordersSlug as any,
+    collection: ordersSlug,
     data: orderData as any,
     req,
   })
+  const createdOrder = order as any
 
   await assignDigitalStockToOrder({
     cartItems,
@@ -348,14 +349,14 @@ export const finalizePaidOrder = async ({
   }
 
   const transaction = await req.payload.create({
-    collection: transactionsSlug as any,
+    collection: transactionsSlug,
     data: txData as any,
     req,
   })
 
   await req.payload.update({
-    collection: ordersSlug as any,
-    id: order.id,
+    collection: ordersSlug,
+    id: createdOrder.id,
     data: { transactions: [transaction.id] } as any,
     req,
   })
@@ -392,7 +393,11 @@ export const finalizePaidOrder = async ({
       const reservationID = `${checkoutSessionID}:${productId}:${variantId}`
 
       try {
-        const stockResult = await confirmStockReservation(req.payload, reservationID, order.id)
+        const stockResult = await confirmStockReservation(
+          req.payload,
+          reservationID,
+          createdOrder.id,
+        )
 
         if (!stockResult.success) {
           req.payload.logger.warn(
@@ -413,8 +418,8 @@ export const finalizePaidOrder = async ({
   }
 
   return {
-    accessToken: order.accessToken,
-    orderID: order.id,
+    accessToken: createdOrder.accessToken,
+    orderID: createdOrder.id,
     pointsEarned,
     transactionID: transaction.id,
   }

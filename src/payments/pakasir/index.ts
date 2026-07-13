@@ -5,6 +5,7 @@ import {
     findFinalizedPayment,
     preparePaymentContext,
 } from '@/payments/helpers'
+import type { CollectionSlug } from 'payload'
 import { PaymentAdapter } from '@payloadcms/plugin-ecommerce/types'
 
 export interface PakasirAdapterConfig {
@@ -54,6 +55,8 @@ export const pakasirAdapter = (config: PakasirAdapterConfig): PaymentAdapter => 
     confirmOrder: async ({ data, ordersSlug, req, transactionsSlug }) => {
       const rawData = data as Record<string, any>
       const paymentIntentID: string = rawData?.paymentIntentID ?? ''
+      const resolvedOrdersSlug = (ordersSlug || 'orders') as CollectionSlug
+      const resolvedTransactionsSlug = (transactionsSlug || 'transactions') as CollectionSlug
 
       req.payload.logger.info(
         { paymentIntentID, customerEmail: rawData?.customerEmail, cartID: rawData?.cartID },
@@ -64,7 +67,7 @@ export const pakasirAdapter = (config: PakasirAdapterConfig): PaymentAdapter => 
         field: 'pakasir.pakasirOrderID',
         paymentReference: paymentIntentID,
         req,
-        transactionsSlug: transactionsSlug || 'transactions',
+        transactionsSlug: resolvedTransactionsSlug,
       })
       if (existing) return { ...existing, message: 'Order already confirmed' }
 
@@ -76,7 +79,7 @@ export const pakasirAdapter = (config: PakasirAdapterConfig): PaymentAdapter => 
 
       // Check if order with this paymentReference already exists
       const existingOrder = await req.payload.find({
-        collection: ordersSlug || 'orders',
+        collection: resolvedOrdersSlug,
         depth: 0,
         limit: 1,
         overrideAccess: true,
@@ -131,7 +134,7 @@ export const pakasirAdapter = (config: PakasirAdapterConfig): PaymentAdapter => 
         customerID: context.customerID,
         discountAmount: context.discountAmount,
         eligibleVoucher: context.eligibleVoucher as Coupon | null,
-        ordersSlug: ordersSlug || 'orders',
+        ordersSlug: resolvedOrdersSlug,
         paymentGroupData: {
           pakasirOrderID: paymentIntentID,
         },
@@ -140,7 +143,7 @@ export const pakasirAdapter = (config: PakasirAdapterConfig): PaymentAdapter => 
         req,
         shippingAddress: context.shippingAddress,
         subtotalBeforeDiscount: context.subtotalBeforeDiscount,
-        transactionsSlug: transactionsSlug || 'transactions',
+        transactionsSlug: resolvedTransactionsSlug,
       })
 
       req.payload.logger.info(

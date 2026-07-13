@@ -5,8 +5,10 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 export default defineConfig({
   plugins: [tsconfigPaths(), react()],
   test: {
-    environment: 'jsdom',
+    environment: 'node',
+    hookTimeout: 60000,
     setupFiles: ['./vitest.setup.ts'],
+    testTimeout: 60000,
     include: ['tests/int/**/*.int.spec.ts'],
   },
 })

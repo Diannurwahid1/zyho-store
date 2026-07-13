@@ -19,21 +19,23 @@ export const isDocumentOwner: Access = ({ req, id }) => {
 
   // Authenticated user - return Where query to filter by customer
   if (req.user?.id) {
-    // Prevent IDOR by ensuring the user can only access their own data
-    return {
-      and: [
-        {
-          customer: {
-            equals: req.user.id,
-          },
+    const and = [
+      {
+        customer: {
+          equals: req.user.id,
         },
-        {
-          id: {
-            equals: id, // Ensure the ID matches the requested document
-          },
+      },
+    ]
+
+    if (id !== undefined) {
+      and.push({
+        id: {
+          equals: id,
         },
-      ],
+      } as never)
     }
+
+    return { and }
   }
 
   // Guest - no access

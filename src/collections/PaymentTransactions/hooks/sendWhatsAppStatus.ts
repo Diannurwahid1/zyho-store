@@ -1,4 +1,4 @@
-import { notifyPaidOrder, notifyPendingPayment } from '@/lib/commerceWhatsApp'
+import { getWhatsAppFailureMeta, notifyPaidOrder, notifyPendingPayment } from '@/lib/commerceWhatsApp'
 import type { CollectionAfterChangeHook } from 'payload'
 
 const PENDING_STATUSES = new Set(['created', 'waiting_payment'])
@@ -30,10 +30,11 @@ export const sendPaymentTransactionWhatsAppAfterChange: CollectionAfterChangeHoo
     })
       .then((result) => {
         if (!result?.success) {
+          const failure = getWhatsAppFailureMeta(result)
           req.payload.logger.error(
             {
-              error: result?.error || result?.reason || 'Unknown WhatsApp failure',
-              recipient: result?.recipient,
+              error: failure.error,
+              recipient: failure.recipient,
               paymentTransactionID: doc.id,
             },
             '[WhatsApp] Pending payment notification failed',
@@ -61,10 +62,11 @@ export const sendPaymentTransactionWhatsAppAfterChange: CollectionAfterChangeHoo
     })
       .then((result) => {
         if (!result?.success) {
+          const failure = getWhatsAppFailureMeta(result)
           req.payload.logger.error(
             {
-              error: result?.error || result?.reason || 'Unknown WhatsApp failure',
-              recipient: result?.recipient,
+              error: failure.error,
+              recipient: failure.recipient,
               paymentTransactionID: doc.id,
             },
             '[WhatsApp] Paid order notification failed',

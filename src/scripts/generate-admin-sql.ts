@@ -3,7 +3,7 @@
  * Usage: node --loader ts-node/esm src/scripts/generate-admin-sql.ts
  */
 
-import bcrypt from 'bcrypt'
+import crypto from 'node:crypto'
 
 const email = process.env.ADMIN_EMAIL
 const password = process.env.ADMIN_PASSWORD
@@ -15,8 +15,11 @@ if (!email || !password || password.length < 16) {
 
 async function generateSQL() {
   try {
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10)
+    const adminPassword = password as string
+    const salt = crypto.randomBytes(32).toString('hex')
+    const hashedPassword = crypto
+      .pbkdf2Sync(adminPassword, salt, 25000, 512, 'sha256')
+      .toString('hex')
     
     console.log('\n' + '='.repeat(60))
     console.log('SQL UNTUK CREATE ADMIN USER')
@@ -27,7 +30,8 @@ async function generateSQL() {
 
 INSERT INTO users (
   email,
-  password,
+  hash,
+  salt,
   roles,
   name,
   "updatedAt",
@@ -35,6 +39,7 @@ INSERT INTO users (
 ) VALUES (
   '${email}',
   '${hashedPassword}',
+  '${salt}',
   '["admin"]',
   '${name}',
   NOW(),
@@ -42,7 +47,8 @@ INSERT INTO users (
 )
 ON CONFLICT (email) 
 DO UPDATE SET 
-  password = EXCLUDED.password,
+  hash = EXCLUDED.hash,
+  salt = EXCLUDED.salt,
   roles = EXCLUDED.roles,
   "updatedAt" = NOW();
 

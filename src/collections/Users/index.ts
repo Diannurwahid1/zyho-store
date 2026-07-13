@@ -1,3 +1,4 @@
+import CryptoJS from 'crypto-js'
 import type { CollectionConfig } from 'payload'
 
 import { adminOnly } from '@/access/adminOnly'
@@ -18,7 +19,7 @@ export const Users: CollectionConfig = {
   slug: 'users',
   access: {
     admin: ({ req: { user } }) => checkRole(['admin'], user),
-    create: adminOrSelf, // Restrict create access to authenticated users
+    create: () => true,
     delete: adminOnly,
     read: adminOrSelf,
     unlock: adminOnly,
@@ -31,7 +32,6 @@ export const Users: CollectionConfig = {
   },
   auth: {
     tokenExpiration: 86400, // 1 day in seconds
-    refreshTokenExpiration: 2592000, // 30 days in seconds
   },
   hooks: {
     beforeChange: [
@@ -113,12 +113,7 @@ export const Users: CollectionConfig = {
         beforeChange: [
           ({ value }) => {
             if (value && typeof value === 'string') {
-              // Encrypt googleId before saving
-              const CryptoJS = require('crypto-js')
-              const encrypted = CryptoJS.AES.encrypt(
-                value,
-                getEncryptionKey(),
-              ).toString()
+              const encrypted = CryptoJS.AES.encrypt(value, getEncryptionKey()).toString()
               return encrypted
             }
             return value
@@ -127,8 +122,6 @@ export const Users: CollectionConfig = {
         afterRead: [
           ({ value }) => {
             if (value && typeof value === 'string') {
-              // Decrypt googleId after reading
-              const CryptoJS = require('crypto-js')
               const decrypted = CryptoJS.AES.decrypt(
                 value,
                 getEncryptionKey(),

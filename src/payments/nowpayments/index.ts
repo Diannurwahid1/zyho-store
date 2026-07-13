@@ -10,6 +10,7 @@ import { usdBaseUnitsToDecimal } from '@/utilities/currencyUnits'
 import { getServerSideURL } from '@/utilities/getURL'
 import { NowPaymentsSDK } from '@nowpaymentsio/nowpayments-sdk-nodejs'
 import type { PaymentAdapter } from '@payloadcms/plugin-ecommerce/types'
+import type { CollectionSlug } from 'payload'
 
 export interface NowPaymentsAdapterConfig {
   apiKey: string
@@ -116,6 +117,8 @@ export const nowpaymentsAdapter = (config: NowPaymentsAdapterConfig): PaymentAda
     confirmOrder: async ({ data, ordersSlug, req, transactionsSlug }) => {
       const rawData = data as Record<string, any>
       const paymentID = String(rawData?.nowpaymentsPaymentID || rawData?.paymentIntentID || '')
+      const resolvedOrdersSlug = (ordersSlug || 'orders') as CollectionSlug
+      const resolvedTransactionsSlug = (transactionsSlug || 'transactions') as CollectionSlug
 
       if (!paymentID) {
         throw new Error('NOWPayments payment ID tidak ditemukan.')
@@ -125,7 +128,7 @@ export const nowpaymentsAdapter = (config: NowPaymentsAdapterConfig): PaymentAda
         field: 'nowpayments.nowpaymentsPaymentID',
         paymentReference: paymentID,
         req,
-        transactionsSlug: transactionsSlug || 'transactions',
+        transactionsSlug: resolvedTransactionsSlug,
       })
       if (existing) return { ...existing, message: 'Order already confirmed' }
 
@@ -156,7 +159,7 @@ export const nowpaymentsAdapter = (config: NowPaymentsAdapterConfig): PaymentAda
         customerID: context.customerID,
         discountAmount: context.discountAmount,
         eligibleVoucher: context.eligibleVoucher as Coupon | null,
-        ordersSlug: ordersSlug || 'orders',
+        ordersSlug: resolvedOrdersSlug,
         paymentGroupData: {
           nowpaymentsPaymentID: paymentID,
           payCurrency: payment.pay_currency || 'usdtbsc',
@@ -166,7 +169,7 @@ export const nowpaymentsAdapter = (config: NowPaymentsAdapterConfig): PaymentAda
         req,
         shippingAddress: context.shippingAddress,
         subtotalBeforeDiscount: context.subtotalBeforeDiscount,
-        transactionsSlug: transactionsSlug || 'transactions',
+        transactionsSlug: resolvedTransactionsSlug,
       })
 
       return {

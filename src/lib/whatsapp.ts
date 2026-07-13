@@ -6,7 +6,7 @@ const WA_BLAST_API_URL = process.env.WA_BLAST_API_URL || ''
 const WA_BLAST_SESSION_ID = process.env.WA_BLAST_SESSION_ID || ''
 const WA_BLAST_TOKEN = process.env.WA_BLAST_TOKEN || ''
 
-type WhatsAppSendResult = {
+export type WhatsAppSendResult = {
   error?: string
   messageId?: string
   recipient: string

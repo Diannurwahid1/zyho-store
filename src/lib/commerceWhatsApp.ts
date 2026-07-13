@@ -3,11 +3,26 @@ import { usdBaseUnitsToDecimal } from '@/utilities/currencyUnits'
 import type { Payload } from 'payload'
 import {
   getAbsoluteMediaURL,
+  type WhatsAppSendResult,
   sendVoucherBlast,
   sendWhatsAppDocument,
   sendWhatsAppImage,
   sendWhatsAppText,
 } from './whatsapp'
+
+const getWhatsAppFailureMeta = (result: WhatsAppSendResult | { reason: string; success: boolean }) => {
+  if ('error' in result || 'recipient' in result) {
+    return {
+      error: 'error' in result ? result.error || 'Unknown WhatsApp failure' : 'Unknown WhatsApp failure',
+      recipient: 'recipient' in result ? result.recipient : undefined,
+    }
+  }
+
+  return {
+    error: result.reason || 'Unknown WhatsApp failure',
+    recipient: undefined,
+  }
+}
 
 const formatCurrency = (amount: number, currencyCode: string = 'IDR') =>
   new Intl.NumberFormat(currencyCode === 'USD' ? 'en-US' : 'id-ID', {
@@ -376,3 +391,5 @@ export const triggerVoucherBlast = async ({
 }) => {
   return sendVoucherBlast({ coupon, payload })
 }
+
+export { getWhatsAppFailureMeta }

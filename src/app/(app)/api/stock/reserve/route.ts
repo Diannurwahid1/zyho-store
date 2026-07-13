@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
     }
     const cartItems = ownedCart.items || []
     const invalidItem = items.some((requested) => {
-      const matching = cartItems.find((cartItem) => {
+      const matching = cartItems.find((cartItem: any) => {
         const productId =
           typeof cartItem.product === 'object' ? cartItem.product?.id : cartItem.product
         const variantId =

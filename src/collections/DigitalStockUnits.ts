@@ -1,4 +1,5 @@
 import { adminOrManager, staffOnly } from '@/access/roles'
+import CryptoJS from 'crypto-js'
 import type { CollectionConfig } from 'payload'
 
 const getEncryptionKey = () => {
@@ -9,13 +10,11 @@ const getEncryptionKey = () => {
 
 const encryptValue = (value: unknown) => {
   if (!value || typeof value !== 'string') return value
-  const CryptoJS = require('crypto-js')
   return CryptoJS.AES.encrypt(value, getEncryptionKey()).toString()
 }
 
 const decryptValue = (value: unknown) => {
   if (!value || typeof value !== 'string') return value
-  const CryptoJS = require('crypto-js')
   const decrypted = CryptoJS.AES.decrypt(value, getEncryptionKey()).toString(CryptoJS.enc.Utf8)
 
   return decrypted || value
