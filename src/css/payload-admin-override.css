@@ -1,0 +1,62 @@
+/* Payload Admin CSS Override - Replace Payload logo with zyho logo */
+
+/* Target Payload SVG logo specifically */
+svg.graphic-logo,
+svg#b.graphic-logo {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Add zyho logo to login page - target the brand container */
+.login__brand {
+  position: relative;
+  min-height: 44px;
+  min-width: 193px;
+}
+
+.login__brand::after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 150px;
+  height: 44px;
+  background-image: url('/media/zyho-store-logo-light.webp');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: left center;
+}
+
+/* Add zyho logo to admin nav (if needed) */
+.nav-template__brand {
+  position: relative;
+  min-height: 24px;
+}
+
+.nav-template__brand::after {
+  content: "";
+  display: block;
+  width: 80px;
+  height: 24px;
+  background-image: url('/media/zyho-store-logo-light.webp');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* Fallback for any other Payload logo containers */
+:is(.login__brand, .nav-template__brand) > svg:first-child {
+  display: none !important;
+}
+
+:is(.login__brand, .nav-template__brand)::after {
+  content: "";
+  display: block;
+  background-image: url('/media/zyho-store-logo-light.webp');
+  background-size: contain;
+  background-repeat: no-repeat;
+}

@@ -1,0 +1,9 @@
+-- Admin bootstrap template.
+-- Do not commit or run SQL containing a static shared password.
+--
+-- Recommended flow:
+-- 1. Set ADMIN_EMAIL and ADMIN_PASSWORD in a local shell.
+-- 2. Run: pnpm tsx src/scripts/generate-admin-sql.ts
+-- 3. Execute the generated SQL in the intended database.
+--
+-- ADMIN_PASSWORD must be unique per environment and at least 16 characters.

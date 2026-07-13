@@ -1,0 +1,57 @@
+import { triggerVoucherBlast } from '@/lib/commerceWhatsApp'
+import type { CollectionAfterChangeHook } from 'payload'
+
+export const sendVoucherBlastAfterChange: CollectionAfterChangeHook = async ({
+  context,
+  doc,
+  previousDoc,
+  req,
+}) => {
+  if (context.skipVoucherWhatsAppBlast) {
+    return doc
+  }
+
+  if (!doc.sendWhatsAppBlast || doc.status !== 'active') {
+    return doc
+  }
+
+  const shouldSend =
+    !previousDoc?.sendWhatsAppBlast ||
+    previousDoc.status !== doc.status ||
+    previousDoc.code !== doc.code ||
+    previousDoc.amount !== doc.amount ||
+    previousDoc.benefitSummary !== doc.benefitSummary ||
+    previousDoc.expiresAt !== doc.expiresAt
+
+  if (!shouldSend) {
+    return doc
+  }
+
+  void triggerVoucherBlast({ coupon: doc as any, payload: req.payload })
+    .then(async (result) => {
+      await req.payload.update({
+        collection: 'coupons',
+        id: doc.id,
+        context: {
+          skipVoucherWhatsAppBlast: true,
+        },
+        data: {
+          sendWhatsAppBlast: false,
+          whatsAppBlastRecipientCount: result.sent,
+          whatsAppBlastSentAt: new Date().toISOString(),
+        } as any,
+        overrideAccess: true,
+      })
+    })
+    .catch((error) => {
+      req.payload.logger.error(
+        {
+          couponID: doc.id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        '[WhatsApp] Voucher blast failed',
+      )
+    })
+
+  return doc
+}

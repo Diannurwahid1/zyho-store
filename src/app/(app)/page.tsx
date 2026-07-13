@@ -1,0 +1,216 @@
+import type { Metadata } from 'next'
+
+import { RenderBlocks } from '@/blocks/RenderBlocks'
+import { ProductShowcase } from '@/components/ProductShowcase'
+import { PromoBanner } from '@/components/PromoBanner'
+import { PromoSection } from '@/components/PromoSection'
+import { Testimonials } from '@/components/Testimonials'
+import { TrustBadges } from '@/components/TrustBadges'
+import { homeStaticData } from '@/endpoints/seed/home-static'
+import { RenderHero } from '@/heros/RenderHero'
+import { generateMeta } from '@/utilities/generateMeta'
+import { getClientLanguage } from '@/utilities/getClientLanguage'
+import configPromise from '@payload-config'
+import { draftMode } from 'next/headers'
+import { getPayload } from 'payload'
+
+import type { Page } from '@/payload-types'
+
+export default async function Page() {
+  const slug = 'home'
+  
+  // Detect language based on IP
+  const language = await getClientLanguage()
+
+  let page = await queryPageBySlug({
+    slug,
+  })
+
+  // Remove this code once your website is seeded
+  if (!page) {
+    page = homeStaticData() as Page
+  }
+
+  if (!page) {
+    return null
+  }
+
+  const { hero, layout } = page
+
+  // Fetch all homepage data
+  const payload = await getPayload({ config: configPromise })
+  
+  // 1. Fetch promo banners
+  const { docs: promoBanners } = await payload.find({
+    collection: 'promo-banners',
+    where: {
+      status: {
+        equals: 'published',
+      },
+    },
+    sort: '-priority',
+    limit: 10,
+  })
+
+  // 2. Get product count for hero
+  const { totalDocs: productCount } = await payload.find({
+    collection: 'products',
+    where: {
+      _status: {
+        equals: 'published',
+      },
+    },
+    limit: 0, // We only need the count
+  })
+
+  // 3. Get featured products for showcase
+  const { docs: products } = await payload.find({
+    collection: 'products',
+    where: {
+      _status: {
+        equals: 'published',
+      },
+    },
+    sort: '-createdAt',
+    limit: 6,
+  })
+
+  // 4. Get testimonials
+  const { docs: testimonials } = await payload.find({
+    collection: 'testimonials',
+    where: {
+      status: {
+        equals: 'published',
+      },
+    },
+    sort: '-priority',
+    limit: 10,
+  })
+
+  // 5. Get settings (for trust badges)
+  const settings = await payload.findGlobal({
+    slug: 'settings',
+  })
+
+  // Transform banners for component
+  const bannerData = promoBanners.map((banner) => ({
+    id: String(banner.id),
+    title: banner.title,
+    image: {
+      url: typeof banner.image === 'object' ? banner.image.url || '' : '',
+      alt: typeof banner.image === 'object' ? banner.image.alt || banner.title : banner.title,
+    },
+    link: banner.link || undefined,
+  }))
+
+  // Transform products for showcase
+  const showcaseProducts = products.map((product) => {
+    const firstImage = product.gallery?.[0]
+    const imageUrl = typeof firstImage?.image === 'object' ? firstImage.image.url : ''
+
+    return {
+      id: product.id,
+      title: product.title,
+      slug: product.slug || '',
+      priceInIDR: typeof product.priceInIDR === 'number' ? product.priceInIDR : undefined,
+      priceInUSD: typeof product.priceInUSD === 'number' ? product.priceInUSD : undefined,
+      inventory: product.inventory || 0,
+      enableVariants: product.enableVariants || false,
+      variants: product.variants?.docs
+        ?.filter((variant) => typeof variant === 'object' && variant !== null)
+        .map((variant) => ({
+          id: variant.id,
+          inventory: variant.inventory,
+        })),
+      image: imageUrl || '',
+      description:
+        product.shortDescription ||
+        (language === 'id'
+          ? 'Produk digital premium siap checkout dan langsung dipakai.'
+          : 'Premium digital product ready for fast checkout and instant use.'),
+    }
+  })
+
+  // Transform testimonials
+  const testimonialData = testimonials.map((testimonial) => {
+    const avatarUrl = typeof testimonial.avatar === 'object' ? testimonial.avatar?.url : ''
+    
+    return {
+      id: String(testimonial.id),
+      name: testimonial.name,
+      role: testimonial.role,
+      commentId: testimonial.commentId,
+      commentEn: testimonial.commentEn,
+      rating: testimonial.rating,
+      avatar: avatarUrl || '',
+    }
+  })
+
+  // Transform settings for TrustBadges
+  const trustBadgesSettings = {
+    trustBadges: {
+      totalUsers: settings.trustBadges?.totalUsers || undefined,
+      satisfactionRate: settings.trustBadges?.satisfactionRate || undefined,
+      supportAvailability: settings.trustBadges?.supportAvailability || undefined,
+      partnerLogos: settings.trustBadges?.partnerLogos?.map((partner) => {
+        const logoMedia = typeof partner.logo === 'object' ? partner.logo : null
+        return {
+          name: partner.name,
+          logo: logoMedia ? {
+            url: logoMedia.url || undefined,
+            alt: logoMedia.alt || undefined,
+          } : null,
+        }
+      }) || undefined,
+    }
+  }
+
+  return (
+    <article className="relative overflow-hidden bg-background text-foreground">
+      <div className="relative z-10">
+        <PromoBanner banners={bannerData} />
+        <PromoSection language={language} />
+        <RenderHero {...hero} language={language} productCount={productCount} />
+        <ProductShowcase language={language} products={showcaseProducts} />
+        <PromoBanner banners={bannerData} />
+        <TrustBadges language={language} settings={trustBadgesSettings} />
+        <Testimonials language={language} testimonials={testimonialData} />
+        <RenderBlocks blocks={layout} />
+      </div>
+    </article>
+  )
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const page = await queryPageBySlug({
+    slug: 'home',
+  })
+
+  return generateMeta({ doc: page })
+}
+
+const queryPageBySlug = async ({ slug }: { slug: string }) => {
+  const { isEnabled: draft } = await draftMode()
+
+  const payload = await getPayload({ config: configPromise })
+
+  const result = await payload.find({
+    collection: 'pages',
+    draft,
+    limit: 1,
+    overrideAccess: draft,
+    pagination: false,
+    where: {
+      and: [
+        {
+          slug: {
+            equals: slug,
+          },
+        },
+        ...(draft ? [] : [{ _status: { equals: 'published' } }]),
+      ],
+    },
+  })
+
+  return result.docs?.[0] || null
+}

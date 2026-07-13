@@ -1,0 +1,21 @@
+import * as migration_20260707_130840 from './20260707_130840'
+import * as migration_20260712_102537_checkout_sessions_membership_points from './20260712_102537_checkout_sessions_membership_points'
+import * as migration_20260712_234500_digital_stock_units from './20260712_234500_digital_stock_units'
+
+export const migrations = [
+  {
+    up: migration_20260707_130840.up,
+    down: migration_20260707_130840.down,
+    name: '20260707_130840',
+  },
+  {
+    up: migration_20260712_102537_checkout_sessions_membership_points.up,
+    down: migration_20260712_102537_checkout_sessions_membership_points.down,
+    name: '20260712_102537_checkout_sessions_membership_points',
+  },
+  {
+    up: migration_20260712_234500_digital_stock_units.up,
+    down: migration_20260712_234500_digital_stock_units.down,
+    name: '20260712_234500_digital_stock_units',
+  },
+]

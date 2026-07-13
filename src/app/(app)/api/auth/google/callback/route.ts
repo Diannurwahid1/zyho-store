@@ -1,0 +1,68 @@
+import {
+  getGoogleStateCookieName,
+  isGoogleAuthEnabled,
+  loginOrCreateGoogleCustomer,
+  parseGoogleOAuthState,
+} from '@/utilities/googleAuth'
+import { getServerSideURL } from '@/utilities/getURL'
+import { NextRequest, NextResponse } from 'next/server'
+import { auditLog, buildAuditMeta, enforceRateLimit } from '@/utilities/security'
+
+export async function GET(req: NextRequest) {
+  const rateLimited = enforceRateLimit({
+    limit: 20,
+    request: req,
+    responseMessage: 'Too many Google auth callbacks',
+    windowMs: 10 * 60_000,
+  })
+  if (rateLimited) return rateLimited
+
+  const fallbackURL = new URL('/login?error=google-auth', getServerSideURL())
+
+  if (!isGoogleAuthEnabled()) {
+    return NextResponse.redirect(fallbackURL)
+  }
+
+  const code = req.nextUrl.searchParams.get('code')
+  const state = parseGoogleOAuthState(req.nextUrl.searchParams.get('state'))
+  const cookieNonce = req.cookies.get(getGoogleStateCookieName())?.value
+
+  if (!code || !state || !cookieNonce || cookieNonce !== state.nonce) {
+    auditLog({
+      level: 'warn',
+      message: '[Security] Google auth callback validation failed',
+      meta: buildAuditMeta(req, { hasCode: Boolean(code), hasState: Boolean(state) }),
+    })
+    return NextResponse.redirect(fallbackURL)
+  }
+
+  try {
+    const { cookie } = await loginOrCreateGoogleCustomer(code)
+    const response = NextResponse.redirect(new URL(state.redirect, getServerSideURL()))
+
+    if (!cookie.value) {
+      throw new Error('Missing session cookie value')
+    }
+
+    response.cookies.set(cookie.name, cookie.value, {
+      domain: cookie.domain,
+      expires: cookie.expires ? new Date(cookie.expires) : undefined,
+      httpOnly: cookie.httpOnly,
+      maxAge: cookie.maxAge,
+      path: cookie.path,
+      sameSite: cookie.sameSite?.toLowerCase() as 'lax' | 'strict' | 'none' | undefined,
+      secure: cookie.secure,
+    })
+    response.cookies.delete(getGoogleStateCookieName())
+
+    auditLog({
+      message: '[Audit] Google auth callback completed',
+      meta: buildAuditMeta(req, { redirect: state.redirect }),
+    })
+
+    return response
+  } catch (error) {
+    console.error('[google callback]', error)
+    return NextResponse.redirect(fallbackURL)
+  }
+}

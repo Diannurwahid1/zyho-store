@@ -1,0 +1,5 @@
+export const BRAND_NAME = 'zyho'
+export const BRAND_DOMAIN = 'zyho.store'
+export const BRAND_LOGO_URL = '/media/zyho-store-logo.webp'
+export const BRAND_LOGO_LIGHT_URL = '/media/zyho-store-logo-light.webp'
+export const BRAND_LOGO_DARK_URL = '/media/zyho-store-logo-dark.webp'
