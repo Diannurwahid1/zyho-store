@@ -5,18 +5,18 @@ import { generatePreviewPath } from '@/utilities/generatePreviewPath'
 import { validateDualCurrencyPricing } from '@/utilities/validateDualCurrencyPricing'
 import { CollectionOverride } from '@payloadcms/plugin-ecommerce/types'
 import {
-  MetaDescriptionField,
-  MetaImageField,
-  MetaTitleField,
-  OverviewField,
-  PreviewField,
+    MetaDescriptionField,
+    MetaImageField,
+    MetaTitleField,
+    OverviewField,
+    PreviewField,
 } from '@payloadcms/plugin-seo/fields'
 import {
-  FixedToolbarFeature,
-  HeadingFeature,
-  HorizontalRuleFeature,
-  InlineToolbarFeature,
-  lexicalEditor,
+    FixedToolbarFeature,
+    HeadingFeature,
+    HorizontalRuleFeature,
+    InlineToolbarFeature,
+    lexicalEditor,
 } from '@payloadcms/richtext-lexical'
 import { DefaultDocumentIDType, slugField, Where } from 'payload'
 

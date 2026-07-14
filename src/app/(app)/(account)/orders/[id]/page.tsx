@@ -1,21 +1,21 @@
 import type { Media, Order } from '@/payload-types'
 import type { Metadata } from 'next'
 
+import { AddressItem } from '@/components/addresses/AddressItem'
+import { OrderStatus } from '@/components/OrderStatus'
 import { Price } from '@/components/Price'
+import { ProductItem } from '@/components/ProductItem'
+import { RichText } from '@/components/RichText'
 import { Button } from '@/components/ui/button'
+import { WhatsAppSupportCard } from '@/components/WhatsAppSupportCard'
 import { formatDateTime } from '@/utilities/formatDateTime'
 import { mergeOpenGraph } from '@/utilities/mergeOpenGraph'
+import configPromise from '@payload-config'
+import { ChevronLeftIcon } from 'lucide-react'
+import { headers as getHeaders } from 'next/headers.js'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { ChevronLeftIcon } from 'lucide-react'
-import { ProductItem } from '@/components/ProductItem'
-import { headers as getHeaders } from 'next/headers.js'
-import configPromise from '@payload-config'
 import { getPayload } from 'payload'
-import { OrderStatus } from '@/components/OrderStatus'
-import { AddressItem } from '@/components/addresses/AddressItem'
-import { WhatsAppSupportCard } from '@/components/WhatsAppSupportCard'
-import { RichText } from '@/components/RichText'
 
 export const dynamic = 'force-dynamic'
 
@@ -111,8 +111,9 @@ export default async function Order({ params, searchParams }: PageProps) {
   if (order.items) {
     for (const item of order.items) {
       const productId = typeof item.product === 'object' ? item.product?.id : item.product
-      if (productId && !productIds.includes(productId)) {
-        productIds.push(productId)
+      const productIdStr = productId != null ? String(productId) : null
+      if (productIdStr && !productIds.includes(productIdStr)) {
+        productIds.push(productIdStr)
       }
     }
   }
