@@ -758,7 +758,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
                   </div>
                     {paymentData.paymentMethod === 'pakasir' && pakasirFee !== null && (
                       <div className="flex items-center justify-between text-muted-foreground">
-                        <span>Biaya admin QRIS</span>
+                        <span>Biaya admin</span>
                         <Price amount={pakasirFee} currencyCode={activeCurrencyCode} />
                       </div>
                     )}

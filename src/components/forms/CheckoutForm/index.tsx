@@ -346,7 +346,7 @@ const PakasirCheckoutForm: React.FC<
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Biaya admin QRIS</span>
+                  <span>Biaya admin</span>
                   <span>
                     {new Intl.NumberFormat('id-ID', {
                       currency: 'IDR',
