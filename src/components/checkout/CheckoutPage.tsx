@@ -11,10 +11,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  buildBuyNowCartItems,
-  calculateCartItemsSubtotal,
-  getBuyNowItemFromSearchParams,
-  matchesBuyNowItem,
+    buildBuyNowCartItems,
+    calculateCartItemsSubtotal,
+    getBuyNowItemFromSearchParams,
+    matchesBuyNowItem,
 } from '@/lib/buyNow'
 import type { EligibleVoucher } from '@/lib/vouchers'
 import { Address } from '@/payload-types'

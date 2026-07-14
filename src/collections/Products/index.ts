@@ -168,6 +168,24 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
               ],
             },
             {
+              name: 'caraPenggunaan',
+              label: 'Cara Penggunaan',
+              type: 'richText',
+              admin: {
+                description:
+                  'Panduan cara penggunaan produk ini. Akan ditampilkan di halaman order setelah pembayaran berhasil.',
+              },
+            },
+            {
+              name: 'garansi',
+              label: 'Garansi',
+              type: 'richText',
+              admin: {
+                description:
+                  'Informasi garansi produk. Akan ditampilkan di halaman order setelah pembayaran berhasil.',
+              },
+            },
+            {
               name: 'productFAQ',
               type: 'array',
               labels: {

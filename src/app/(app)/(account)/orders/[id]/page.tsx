@@ -15,6 +15,7 @@ import { getPayload } from 'payload'
 import { OrderStatus } from '@/components/OrderStatus'
 import { AddressItem } from '@/components/addresses/AddressItem'
 import { WhatsAppSupportCard } from '@/components/WhatsAppSupportCard'
+import { RichText } from '@/components/RichText'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,6 +105,45 @@ export default async function Order({ params, searchParams }: PageProps) {
   if (!order) {
     notFound()
   }
+
+  // Fetch product details (caraPenggunaan & garansi) for each item in the order
+  const productIds: string[] = []
+  if (order.items) {
+    for (const item of order.items) {
+      const productId = typeof item.product === 'object' ? item.product?.id : item.product
+      if (productId && !productIds.includes(productId)) {
+        productIds.push(productId)
+      }
+    }
+  }
+
+  type ProductGuide = {
+    id: string
+    title?: string | null
+    caraPenggunaan?: any
+    garansi?: any
+  }
+
+  let productGuides: ProductGuide[] = []
+  if (productIds.length > 0) {
+    try {
+      const { docs } = await payload.find({
+        collection: 'products',
+        depth: 0,
+        limit: productIds.length,
+        overrideAccess: true,
+        pagination: false,
+        where: { id: { in: productIds } },
+        select: { title: true, caraPenggunaan: true, garansi: true },
+      })
+      productGuides = docs as ProductGuide[]
+    } catch (e) {
+      console.error('Failed to fetch product guides', e)
+    }
+  }
+
+  const hasCaraPenggunaan = productGuides.some((p) => p.caraPenggunaan)
+  const hasGaransi = productGuides.some((p) => p.garansi)
 
   return (
     <div className="">
@@ -291,6 +331,42 @@ export default async function Order({ params, searchParams }: PageProps) {
               </div>
             </div>
           )}
+
+        {hasCaraPenggunaan && (
+          <div>
+            <h2 className="font-mono text-primary/50 mb-4 uppercase text-sm">Cara Penggunaan</h2>
+            <div className="space-y-4">
+              {productGuides
+                .filter((p) => p.caraPenggunaan)
+                .map((p) => (
+                  <div key={p.id} className="rounded-xl border bg-background/40 p-4">
+                    {productGuides.length > 1 && p.title && (
+                      <p className="mb-2 text-sm font-semibold text-muted-foreground">{p.title}</p>
+                    )}
+                    <RichText data={p.caraPenggunaan} enableGutter={false} />
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {hasGaransi && (
+          <div>
+            <h2 className="font-mono text-primary/50 mb-4 uppercase text-sm">Garansi</h2>
+            <div className="space-y-4">
+              {productGuides
+                .filter((p) => p.garansi)
+                .map((p) => (
+                  <div key={p.id} className="rounded-xl border bg-background/40 p-4">
+                    {productGuides.length > 1 && p.title && (
+                      <p className="mb-2 text-sm font-semibold text-muted-foreground">{p.title}</p>
+                    )}
+                    <RichText data={p.garansi} enableGutter={false} />
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
 
         <WhatsAppSupportCard
           description="Jika ada kendala akses akun, file digital, atau status pesanan, langsung hubungi admin kami lewat WhatsApp agar cepat ditangani."

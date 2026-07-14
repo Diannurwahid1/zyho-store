@@ -7,7 +7,7 @@ import { useCart } from '@payloadcms/plugin-ecommerce/client/react'
 import { ClipboardList, Home, ShoppingBag, Sparkles, User } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import React, { useMemo } from 'react'
+import { useMemo } from 'react'
 import { toast } from 'sonner'
 
 const dockItems = [
