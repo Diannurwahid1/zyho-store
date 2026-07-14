@@ -3,10 +3,11 @@
 import { Cart } from '@/components/Cart'
 import { useAuth } from '@/providers/Auth'
 import { cn } from '@/utilities/cn'
+import { useCart } from '@payloadcms/plugin-ecommerce/client/react'
 import { ClipboardList, Home, ShoppingBag, Sparkles, User } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import React from 'react'
+import React, { useMemo } from 'react'
 import { toast } from 'sonner'
 
 const dockItems = [
@@ -17,6 +18,11 @@ const dockItems = [
 export function MobileBottomNav() {
   const pathname = usePathname()
   const { user } = useAuth()
+  const { cart } = useCart()
+  const cartCount = useMemo(() => {
+    if (!cart?.items?.length) return 0
+    return cart.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
+  }, [cart])
 
   const accountHref = '/account'
   const accountActive = pathname.startsWith('/account')
@@ -32,10 +38,15 @@ export function MobileBottomNav() {
               trigger={
                 <button
                   aria-label="Keranjang"
-                  className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-background shadow-[0_10px_28px_rgba(15,23,42,0.26)] ring-4 ring-background transition-transform active:scale-95"
+                  className="pointer-events-auto relative flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-background shadow-[0_10px_28px_rgba(15,23,42,0.26)] ring-4 ring-background transition-transform active:scale-95"
                   type="button"
                 >
                   <ShoppingBag className="h-6 w-6" />
+                  {cartCount > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-background">
+                      {cartCount > 9 ? '9+' : cartCount}
+                    </span>
+                  )}
                 </button>
               }
             />
