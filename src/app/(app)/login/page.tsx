@@ -1,15 +1,13 @@
 import type { Metadata } from 'next'
 
 import { RenderParams } from '@/components/RenderParams'
-import Link from 'next/link'
-import React from 'react'
 
-import { headers as getHeaders } from 'next/headers'
-import configPromise from '@payload-config'
-import { getPayload } from 'payload'
 import { LoginForm } from '@/components/forms/LoginForm'
-import { redirect } from 'next/navigation'
 import { isGoogleAuthEnabled } from '@/utilities/googleAuth'
+import configPromise from '@payload-config'
+import { headers as getHeaders } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { getPayload } from 'payload'
 
 export default async function Login() {
   const headers = await getHeaders()
@@ -26,10 +24,6 @@ export default async function Login() {
         <RenderParams />
 
         <h1 className="mb-4 text-[1.8rem]">Login Customer</h1>
-        <p className="mb-8">
-          {`Halaman ini khusus customer. Jalur utama masuk menggunakan Google Sign-In agar akun member langsung aktif dan siap dipakai. Untuk akses admin gunakan jalur khusus `}
-          <Link href="/mlebu/collections/users">/mlebu</Link>.
-        </p>
         <LoginForm googleEnabled={isGoogleAuthEnabled()} />
       </div>
     </div>

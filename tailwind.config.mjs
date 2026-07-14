@@ -92,9 +92,15 @@ export default {
             '--tw-prose-body': 'var(--text)',
             '--tw-prose-headings': 'var(--text)',
             h1: {
-              fontSize: '4rem',
+              fontSize: '2rem',
               fontWeight: 'normal',
               marginBottom: '0.25em',
+              '@media (min-width: 768px)': {
+                fontSize: '3rem',
+              },
+              '@media (min-width: 1024px)': {
+                fontSize: '4rem',
+              },
             },
             a: {
               color: 'inherit',
