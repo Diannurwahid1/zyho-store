@@ -137,7 +137,7 @@ export default async function Order({ params, searchParams }: PageProps) {
         where: { id: { in: productIds } },
         select: { title: true, caraPenggunaan: true, garansi: true },
       })
-      productGuides = docs as ProductGuide[]
+      productGuides = docs as unknown as ProductGuide[]
     } catch (e) {
       console.error('Failed to fetch product guides', e)
     }
