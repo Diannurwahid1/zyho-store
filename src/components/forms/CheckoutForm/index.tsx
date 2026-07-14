@@ -32,6 +32,7 @@ type Props = {
   selectedVoucherCode?: string
   buyNowItem?: BuyNowItem | null
   onOrderConfirmed?: (orderID: string) => Promise<void> | void
+  onFeeKnown?: (fee: number) => void
 }
 
 const PakasirCheckoutForm: React.FC<
@@ -48,6 +49,7 @@ const PakasirCheckoutForm: React.FC<
     | 'billingAddress'
     | 'isNowPayments'
     | 'onOrderConfirmed'
+    | 'onFeeKnown'
     | 'orderID'
     | 'nowpaymentsPayAddress'
     | 'nowpaymentsPayAmount'
@@ -77,6 +79,7 @@ const PakasirCheckoutForm: React.FC<
   shippingAddress,
   buyNowItem,
   onOrderConfirmed,
+  onFeeKnown,
 }) => {
   const [error, setError] = useState<null | string>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -250,6 +253,9 @@ const PakasirCheckoutForm: React.FC<
       setExpiredAt(expired_at)
       setStatus('waiting')
       setTotalPayment(total_payment)
+      if (onFeeKnown && typeof total_payment === 'number' && typeof amount === 'number') {
+        onFeeKnown(total_payment - amount)
+      }
       startPolling()
     } catch {
       setError('Gagal menghubungi server pembayaran.')
@@ -327,18 +333,53 @@ const PakasirCheckoutForm: React.FC<
           </div>
 
           <div className="space-y-1 text-center">
-            <p className="text-lg font-semibold">
-              Total:{' '}
-              {isNowPayments
-                ? `${nowpaymentsPayAmount || '-'} ${String(nowpaymentsPayCurrency || 'USDT').toUpperCase()}`
-                : typeof totalPayment === 'number'
-                  ? new Intl.NumberFormat('id-ID', {
+            {!isNowPayments && typeof totalPayment === 'number' && typeof amount === 'number' ? (
+              <div className="w-full rounded-xl border bg-muted/50 px-4 py-3 text-sm space-y-2">
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span>
+                    {new Intl.NumberFormat('id-ID', {
                       currency: 'IDR',
                       maximumFractionDigits: 0,
                       style: 'currency',
-                    }).format(totalPayment)
-                  : '-'}
-            </p>
+                    }).format(amount)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <span>Biaya admin QRIS</span>
+                  <span>
+                    {new Intl.NumberFormat('id-ID', {
+                      currency: 'IDR',
+                      maximumFractionDigits: 0,
+                      style: 'currency',
+                    }).format(totalPayment - amount)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-t pt-2 font-semibold text-base">
+                  <span>Total bayar</span>
+                  <span>
+                    {new Intl.NumberFormat('id-ID', {
+                      currency: 'IDR',
+                      maximumFractionDigits: 0,
+                      style: 'currency',
+                    }).format(totalPayment)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-lg font-semibold">
+                Total:{' '}
+                {isNowPayments
+                  ? `${nowpaymentsPayAmount || '-'} ${String(nowpaymentsPayCurrency || 'USDT').toUpperCase()}`
+                  : typeof totalPayment === 'number'
+                    ? new Intl.NumberFormat('id-ID', {
+                        currency: 'IDR',
+                        maximumFractionDigits: 0,
+                        style: 'currency',
+                      }).format(totalPayment)
+                    : '-'}
+              </p>
+            )}
             {isNowPayments && nowpaymentsPayAddress ? (
               <div className="space-y-2">
                 <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
@@ -399,6 +440,7 @@ export const CheckoutForm: React.FC<Props> = ({
   billingAddress,
   isNowPayments,
   onOrderConfirmed,
+  onFeeKnown,
   nowpaymentsPayAddress,
   nowpaymentsPayAmount,
   nowpaymentsPayCurrency,
@@ -423,6 +465,7 @@ export const CheckoutForm: React.FC<Props> = ({
       customerPhone={customerPhone}
       isNowPayments={isNowPayments}
       onOrderConfirmed={onOrderConfirmed}
+      onFeeKnown={onFeeKnown}
       nowpaymentsPayAddress={nowpaymentsPayAddress}
       nowpaymentsPayAmount={nowpaymentsPayAmount}
       nowpaymentsPayCurrency={nowpaymentsPayCurrency}

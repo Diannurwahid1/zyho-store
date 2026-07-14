@@ -19,7 +19,6 @@ import {
 import type { EligibleVoucher } from '@/lib/vouchers'
 import { Address } from '@/payload-types'
 import { useAuth } from '@/providers/Auth'
-import { buildAnalyticsItem, gaBeginCheckout } from '@/utilities/googleAnalytics'
 import { useCart, useCurrency, usePayments } from '@payloadcms/plugin-ecommerce/client/react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -70,6 +69,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
   const [reservationId, setReservationId] = useState<string | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [selectedVoucherCode, setSelectedVoucherCode] = useState<string>('')
+  const [pakasirFee, setPakasirFee] = useState<number | null>(null)
   const [checkoutSession, setCheckoutSession] = useState<CheckoutSessionState>({
     isLocked: false,
     sessionId: null,
@@ -84,23 +84,6 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
   const checkoutSubtotal = useMemo(
     () => calculateCartItemsSubtotal(checkoutItems, currency.code),
     [checkoutItems, currency.code],
-  )
-  const activeCurrencyCode = currency.code === 'USD' ? 'USD' : 'IDR'
-  const activePaymentMethod = activeCurrencyCode === 'USD' ? 'nowpayments' : 'pakasir'
-  const analyticsItems = useMemo(
-    () =>
-      checkoutItems
-        .filter((item) => typeof item.product === 'object' && item.product)
-        .map((item) =>
-          buildAnalyticsItem({
-            currency: activeCurrencyCode,
-            product: item.product,
-            quantity: item.quantity ?? 1,
-            variant:
-              item.variant && typeof item.variant === 'object' ? item.variant : null,
-          }),
-        ),
-    [checkoutItems, activeCurrencyCode],
   )
 
   const eligibleVouchers = useMemo(
@@ -254,6 +237,8 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
 
   const cartIsEmpty = checkoutItems.length === 0
   const canGoToPayment = Boolean(user?.email && whatsAppNumber)
+  const activeCurrencyCode = currency.code === 'USD' ? 'USD' : 'IDR'
+  const activePaymentMethod = activeCurrencyCode === 'USD' ? 'nowpayments' : 'pakasir'
 
   const persistWhatsAppToProfile = useCallback(async () => {
     if (!user || !normalizedWhatsAppNumber || normalizedWhatsAppNumber === normalizedProfilePhone) {
@@ -434,11 +419,6 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
       paymentCreated = Boolean(nextPaymentData)
 
       if (nextPaymentData) {
-        gaBeginCheckout({
-          currency: activeCurrencyCode,
-          value: Number(nextPaymentData.amount || 0),
-        })
-
         const paymentDataWithMethod: PaymentData = {
           ...nextPaymentData,
           paymentMethod: activePaymentMethod as 'nowpayments' | 'pakasir',
@@ -776,16 +756,28 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
                     <span>Potongan voucher</span>
                     <Price amount={paymentData.discountAmount} currencyCode={activeCurrencyCode} />
                   </div>
-                  <div className="flex items-center justify-between border-t pt-3 text-base font-semibold">
-                    <span>Total bayar</span>
-                    <Price amount={paymentData.amount} currencyCode={activeCurrencyCode} />
+                    {paymentData.paymentMethod === 'pakasir' && pakasirFee !== null && (
+                      <div className="flex items-center justify-between text-muted-foreground">
+                        <span>Biaya admin QRIS</span>
+                        <Price amount={pakasirFee} currencyCode={activeCurrencyCode} />
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between border-t pt-3 text-base font-semibold">
+                      <span>Total bayar</span>
+                      <Price
+                        amount={
+                          paymentData.paymentMethod === 'pakasir' && pakasirFee !== null
+                            ? paymentData.amount + pakasirFee
+                            : paymentData.amount
+                        }
+                        currencyCode={activeCurrencyCode}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
               <CheckoutForm
                 amount={paymentData.amount}
-                analyticsItems={analyticsItems}
                 billingAddress={checkoutContactAddress}
                 buyNowItem={buyNowItem}
                 cartID={reservationBaseId}
@@ -800,6 +792,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
                 nowpaymentsPayCurrency={paymentData.nowpaymentsPayCurrency}
                 nowpaymentsPaymentID={paymentData.nowpaymentsPaymentID}
                 onOrderConfirmed={handleOrderConfirmed}
+                onFeeKnown={(fee) => setPakasirFee(fee)}
                 orderID={paymentData.orderID}
                 selectedVoucherCode={paymentData.voucherCode || selectedVoucherCode}
                 setProcessingPayment={setProcessingPayment}
