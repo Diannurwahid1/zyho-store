@@ -372,7 +372,7 @@ const PakasirCheckoutForm: React.FC<
                 : 'Scan QR di atas dengan aplikasi e-wallet atau mobile banking Anda.'}
             </p>
 
-            {!isNowPayments && process.env.NEXT_PUBLIC_PAKASIR_SANDBOX === 'true' && (
+            {!isNowPayments && process.env.NEXT_PUBLIC_PAKASIR_SANDBOX === 'true' && process.env.NODE_ENV !== 'production' && (
               <Button
                 type="button"
                 variant="outline"
