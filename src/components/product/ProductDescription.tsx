@@ -109,9 +109,8 @@ export function ProductDescription({ product }: { product: Product }) {
         </Suspense>
       </div>
 
-      <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
+      <div className="grid gap-3 text-sm text-muted-foreground sm:grid-cols-2">
         <div className="rounded-2xl border p-4">Akses download via akun</div>
-        <div className="rounded-2xl border p-4">License tersimpan otomatis</div>
         <div className="rounded-2xl border p-4">Support setelah pembelian</div>
       </div>
     </div>

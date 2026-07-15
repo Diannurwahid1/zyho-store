@@ -3,6 +3,7 @@ import type { Media, Product } from '@/payload-types'
 import { RenderBlocks } from '@/blocks/RenderBlocks'
 import { GridTileImage } from '@/components/Grid/tile'
 import { Gallery } from '@/components/product/Gallery'
+import { PolicyCard } from '@/components/product/PolicyCard'
 import { ProductDescription } from '@/components/product/ProductDescription'
 import { Button } from '@/components/ui/button'
 import configPromise from '@payload-config'
@@ -165,19 +166,21 @@ export default async function ProductPage({ params }: Args) {
           </div>
         </div>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-3">
+        <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-3xl border bg-background p-6">
             <p className="text-sm text-muted-foreground">Akses</p>
             <p className="mt-2 font-semibold">Download aman setelah pembayaran</p>
           </div>
           <div className="rounded-3xl border bg-background p-6">
-            <p className="text-sm text-muted-foreground">License</p>
-            <p className="mt-2 font-semibold">{product.licenseType || 'Standard'} license</p>
-          </div>
-          <div className="rounded-3xl border bg-background p-6">
             <p className="text-sm text-muted-foreground">Versi</p>
             <p className="mt-2 font-semibold">{product.version || '1.0.0'}</p>
           </div>
+          {product.updatePolicy && (
+            <PolicyCard title="Update Policy" content={product.updatePolicy} />
+          )}
+          {product.refundPolicy && (
+            <PolicyCard title="Refund Policy" content={product.refundPolicy} />
+          )}
         </div>
       </div>
 
