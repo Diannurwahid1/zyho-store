@@ -162,7 +162,7 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
               name: 'includedFiles',
               type: 'array',
               fields: [
-                { name: 'label', type: 'text', required: true },
+                { name: 'label', type: 'text' },
                 { name: 'format', type: 'text' },
                 { name: 'size', type: 'text' },
               ],
