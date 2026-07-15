@@ -5,8 +5,8 @@ import { GenerateTitle, GenerateURL } from '@payloadcms/plugin-seo/types'
 import { FixedToolbarFeature, HeadingFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
 import { Plugin } from 'payload'
 
-import { pakasirAdapter } from '@/payments/pakasir/index'
 import { nowpaymentsAdapter } from '@/payments/nowpayments/index'
+import { pakasirAdapter } from '@/payments/pakasir/index'
 
 import { adminOnlyFieldAccess } from '@/access/adminOnlyFieldAccess'
 import { adminOrPublishedStatus } from '@/access/adminOrPublishedStatus'
@@ -14,12 +14,12 @@ import { customerOnlyFieldAccess } from '@/access/customerOnlyFieldAccess'
 import { isAdmin } from '@/access/isAdmin'
 import { isDocumentOwner } from '@/access/isDocumentOwner'
 import { CartsCollection } from '@/collections/Carts'
+import {
+    syncMembershipAfterOrderChange,
+    syncMembershipAfterOrderDelete,
+} from '@/collections/Orders/hooks/syncMembership'
 import { ProductsCollection } from '@/collections/Products'
 import { sendTransactionWhatsAppAfterChange } from '@/collections/Transactions/hooks/sendWhatsAppStatus'
-import {
-  syncMembershipAfterOrderChange,
-  syncMembershipAfterOrderDelete,
-} from '@/collections/Orders/hooks/syncMembership'
 import { Page, Product } from '@/payload-types'
 import { getServerSideURL } from '@/utilities/getURL'
 import { validateDualCurrencyPricing } from '@/utilities/validateDualCurrencyPricing'

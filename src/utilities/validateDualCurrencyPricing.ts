@@ -1,5 +1,5 @@
-import { CollectionBeforeChangeHook } from 'payload'
 import { normalizeStoredUSDToBaseUnits } from '@/utilities/currencyUnits'
+import { CollectionBeforeChangeHook } from 'payload'
 
 export const validateDualCurrencyPricing = (
   args: Parameters<CollectionBeforeChangeHook>[0],
@@ -25,7 +25,10 @@ export const validateDualCurrencyPricing = (
   const hasUSD = typeof nextData.priceInUSD === 'number' && Number.isFinite(nextData.priceInUSD)
 
   if (!hasIDR || !hasUSD) {
-    throw new Error(`${label} wajib mengisi harga IDR dan USD.`)
+    // Only enforce validation when publishing
+    if (nextData._status === 'published') {
+      throw new Error(`${label} wajib mengisi harga IDR dan USD.`)
+    }
   }
 
   nextData.priceInUSD = normalizeStoredUSDToBaseUnits(nextData.priceInUSD)

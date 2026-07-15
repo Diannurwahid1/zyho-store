@@ -1,19 +1,18 @@
 import {
-  buildBuyNowCartItems,
-  calculateCartItemsSubtotal,
-  getBuyNowItemFromRawData,
+    buildBuyNowCartItems,
+    calculateCartItemsSubtotal,
+    getBuyNowItemFromRawData,
 } from '@/lib/buyNow'
+import { assertOwnedActiveCheckoutSession } from '@/lib/checkoutSessionServer'
 import { assignDigitalStockToOrder } from '@/lib/digitalStock'
 import { confirmStockReservation } from '@/lib/stock'
 import {
-  calculateVoucherDiscount,
-  getVoucherByCodeForUser,
-  normalizeCouponCode,
+    calculateVoucherDiscount,
+    getVoucherByCodeForUser,
+    normalizeCouponCode,
 } from '@/lib/vouchers'
-import type { Coupon } from '@/payload-types'
-import type { Address } from '@/payload-types'
+import type { Address, Coupon } from '@/payload-types'
 import { assertCurrencyEnabled } from '@/utilities/currencySettings'
-import { assertOwnedActiveCheckoutSession } from '@/lib/checkoutSessionServer'
 import type { CollectionSlug, PayloadRequest } from 'payload'
 
 type PreparedPaymentContext = {
