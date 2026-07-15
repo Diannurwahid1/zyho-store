@@ -288,7 +288,7 @@ export const plugins: Plugin[] = [
             ...defaultCollection.hooks,
             beforeChange: [
               ...(defaultCollection.hooks?.beforeChange || []),
-              ({ data }) => validateDualCurrencyPricing(data as Record<string, any>, 'Variant'),
+              (args) => validateDualCurrencyPricing(args, 'Variant'),
             ],
           },
         }),

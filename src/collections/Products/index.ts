@@ -26,7 +26,7 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
     ...defaultCollection.hooks,
     beforeChange: [
       ...(defaultCollection.hooks?.beforeChange || []),
-      ({ data }) => validateDualCurrencyPricing(data as Record<string, any>, 'Produk'),
+      (args) => validateDualCurrencyPricing(args, 'Produk'),
     ],
   },
   admin: {
