@@ -13,8 +13,8 @@ export const validateDualCurrencyPricing = (
   nextData.priceInIDREnabled = true
   nextData.priceInUSDEnabled = true
 
-  // Skip validation for drafts or autosaves
-  if (nextData._status === 'draft' || req.payloadAPI === 'autosave') {
+  // Skip validation for drafts
+  if (nextData._status === 'draft') {
     if (typeof nextData.priceInUSD === 'number') {
       nextData.priceInUSD = normalizeStoredUSDToBaseUnits(nextData.priceInUSD)
     }
