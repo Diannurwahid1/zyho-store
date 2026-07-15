@@ -41,7 +41,8 @@ const ensureCartBelongsToUser = async ({
     return cart
   }
 
-  if (!cartCustomer && cartSecret && cart.secret && String(cart.secret) === String(cartSecret)) {
+  if (!cartCustomer) {
+    // If cart has no customer, claim it for this user
     return payload.update({
       collection: 'carts',
       id: cart.id,
@@ -52,7 +53,16 @@ const ensureCartBelongsToUser = async ({
     })
   }
 
-  return null
+  // If cart belongs to someone else, clone it for this user
+  return payload.create({
+    collection: 'carts',
+    data: {
+      customer: userID,
+      items: cart.items || [],
+      currency: cart.currency,
+    } as any,
+    overrideAccess: true,
+  })
 }
 
 export async function GET(req: NextRequest) {
@@ -122,7 +132,7 @@ export async function POST(req: NextRequest) {
       collection: 'checkout-sessions' as any,
       data: {
         activeKey: `customer:${user.id}`,
-        cartId: String(body.cartId),
+        cartId: String(ownedCart.id),
         currency,
         customer: user.id,
         expiresAt,

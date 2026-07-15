@@ -21,7 +21,7 @@ const ensureCartBelongsToUser = async ({
     return cart
   }
 
-  if (!cartCustomer && cartSecret && cart.secret && String(cart.secret) === String(cartSecret)) {
+  if (!cartCustomer) {
     return payload.update({
       collection: 'carts',
       id: cart.id,
@@ -32,7 +32,15 @@ const ensureCartBelongsToUser = async ({
     })
   }
 
-  return null
+  return payload.create({
+    collection: 'carts',
+    data: {
+      customer: userID,
+      items: cart.items || [],
+      currency: cart.currency,
+    } as any,
+    overrideAccess: true,
+  })
 }
 
 /**
