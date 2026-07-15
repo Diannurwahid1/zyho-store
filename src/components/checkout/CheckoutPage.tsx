@@ -75,6 +75,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
     sessionId: null,
     expiresAt: null,
   })
+  const [termsAccepted, setTermsAccepted] = useState(false)
   const buyNowItem = useMemo(() => getBuyNowItemFromSearchParams(searchParams), [searchParams])
   const cartItems = useMemo(() => cart?.items || [], [cart?.items])
   const checkoutItems = useMemo(
@@ -713,16 +714,34 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
         </div>
 
         {!paymentData && (
-          <Button
-            className="self-start"
-            disabled={!canGoToPayment || checkoutSession.isLocked}
-            onClick={(e) => {
-              e.preventDefault()
-              void initiatePaymentIntent()
-            }}
-          >
-            Lanjut ke pembayaran
-          </Button>
+          <div className="space-y-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                className="mt-1 h-4 w-4"
+                required
+              />
+              <div className="text-sm">
+                <span>Saya menyetujui </span>
+                <Link href="/terms-and-conditions" className="underline text-primary hover:text-primary/80">
+                  Syarat & Ketentuan
+                </Link>
+                <span>. Segala bentuk pembelian dan uang yang sudah dibayar tidak dapat dikembalikan.</span>
+              </div>
+            </label>
+            <Button
+              className="self-start"
+              disabled={!canGoToPayment || checkoutSession.isLocked || !termsAccepted}
+              onClick={(e) => {
+                e.preventDefault()
+                void initiatePaymentIntent()
+              }}
+            >
+              Lanjut ke pembayaran
+            </Button>
+          </div>
         )}
 
         {!paymentData && checkoutSession.isLocked && (
