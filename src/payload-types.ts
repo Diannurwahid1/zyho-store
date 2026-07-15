@@ -424,7 +424,7 @@ export interface Product {
   layout?: (CallToActionBlock | ContentBlock | MediaBlock)[] | null;
   includedFiles?:
     | {
-        label: string;
+        label?: string | null;
         format?: string | null;
         size?: string | null;
         id?: string | null;

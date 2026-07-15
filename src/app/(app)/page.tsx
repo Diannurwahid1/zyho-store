@@ -5,7 +5,6 @@ import { ProductShowcase } from '@/components/ProductShowcase'
 import { PromoBanner } from '@/components/PromoBanner'
 import { PromoSection } from '@/components/PromoSection'
 import { Testimonials } from '@/components/Testimonials'
-import { TrustBadges } from '@/components/TrustBadges'
 import { homeStaticData } from '@/endpoints/seed/home-static'
 import { RenderHero } from '@/heros/RenderHero'
 import { generateMeta } from '@/utilities/generateMeta'
@@ -146,25 +145,6 @@ export default async function Page() {
     }
   })
 
-  // Transform settings for TrustBadges
-  const trustBadgesSettings = {
-    trustBadges: {
-      totalUsers: settings.trustBadges?.totalUsers || undefined,
-      satisfactionRate: settings.trustBadges?.satisfactionRate || undefined,
-      supportAvailability: settings.trustBadges?.supportAvailability || undefined,
-      partnerLogos: settings.trustBadges?.partnerLogos?.map((partner) => {
-        const logoMedia = typeof partner.logo === 'object' ? partner.logo : null
-        return {
-          name: partner.name,
-          logo: logoMedia ? {
-            url: logoMedia.url || undefined,
-            alt: logoMedia.alt || undefined,
-          } : null,
-        }
-      }) || undefined,
-    }
-  }
-
   return (
     <article className="relative overflow-hidden bg-background text-foreground">
       <div className="relative z-10">
@@ -173,7 +153,6 @@ export default async function Page() {
         <RenderHero {...hero} language={language} productCount={productCount} />
         <ProductShowcase language={language} products={showcaseProducts} />
         <PromoBanner banners={bannerData} />
-        <TrustBadges language={language} settings={trustBadgesSettings} />
         <Testimonials language={language} testimonials={testimonialData} />
         <RenderBlocks blocks={layout} />
       </div>
