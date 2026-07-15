@@ -30,6 +30,8 @@ const inter = Inter({
   display: 'swap',
 })
 
+export const dynamic = 'force-dynamic'
+
 export async function generateMetadata(): Promise<Metadata> {
   const baseUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000'
   const iconUrl = BRAND_LOGO_URL
