@@ -1,14 +1,14 @@
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import {
-  BoldFeature,
-  EXPERIMENTAL_TableFeature,
-  IndentFeature,
-  ItalicFeature,
-  LinkFeature,
-  OrderedListFeature,
-  UnderlineFeature,
-  UnorderedListFeature,
-  lexicalEditor,
+    BoldFeature,
+    EXPERIMENTAL_TableFeature,
+    IndentFeature,
+    ItalicFeature,
+    LinkFeature,
+    OrderedListFeature,
+    UnderlineFeature,
+    UnorderedListFeature,
+    lexicalEditor,
 } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { buildConfig } from 'payload'
@@ -33,9 +33,11 @@ import { SupportMessages } from '@/collections/SupportMessages'
 import { SupportTickets } from '@/collections/SupportTickets'
 import { Testimonials } from '@/collections/Testimonials'
 import { Users } from '@/collections/Users'
+import { WaitlistEntries } from '@/collections/WaitlistEntries'
+import { Waitlists } from '@/collections/Waitlists'
+import { AdminWhatsAppBlast } from '@/globals/AdminWhatsAppBlast'
 import { Footer } from '@/globals/Footer'
 import { Header } from '@/globals/Header'
-import { AdminWhatsAppBlast } from '@/globals/AdminWhatsAppBlast'
 import { Settings } from '@/globals/Settings'
 import { StockAdjustment } from '@/globals/StockAdjustment'
 import { plugins } from './plugins'
@@ -91,6 +93,8 @@ export default buildConfig({
     EmailTemplates,
     StockReservations,
     StockLedger,
+    Waitlists,
+    WaitlistEntries,
   ],
   db: postgresAdapter({
     pool: {

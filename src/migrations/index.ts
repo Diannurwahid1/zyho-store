@@ -3,6 +3,7 @@ import * as migration_20260712_102537_checkout_sessions_membership_points from '
 import * as migration_20260712_234500_digital_stock_units from './20260712_234500_digital_stock_units';
 import * as migration_20260713_004500_settings_commerce_enable_usd from './20260713_004500_settings_commerce_enable_usd';
 import * as migration_20260714_145643 from './20260714_145643';
+import * as migration_20260715_094745_waitlist_collections from './20260715_094745_waitlist_collections';
 
 export const migrations = [
   {
@@ -28,6 +29,11 @@ export const migrations = [
   {
     up: migration_20260714_145643.up,
     down: migration_20260714_145643.down,
-    name: '20260714_145643'
+    name: '20260714_145643',
+  },
+  {
+    up: migration_20260715_094745_waitlist_collections.up,
+    down: migration_20260715_094745_waitlist_collections.down,
+    name: '20260715_094745_waitlist_collections'
   },
 ];

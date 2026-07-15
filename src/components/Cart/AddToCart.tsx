@@ -1,9 +1,10 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { gaAddToCart } from '@/utilities/googleAnalytics'
 import type { Product, Variant } from '@/payload-types'
+import { gaAddToCart } from '@/utilities/googleAnalytics'
 
+import { WaitlistDialog } from '@/components/WaitlistDialog'
 import { useActiveCheckout } from '@/hooks/useActiveCheckout'
 import { useCart, useCurrency } from '@payloadcms/plugin-ecommerce/client/react'
 import clsx from 'clsx'
@@ -154,6 +155,25 @@ export function AddToCart({ product }: Props) {
     return (product.inventory ?? 0) <= 0
   }, [selectedVariant, product, availableStock])
 
+  if (isOutOfStock) {
+    return (
+      <WaitlistDialog 
+        productId={product.id} 
+        productTitle={product.title}
+        trigger={
+          <Button
+            aria-label="Join Waiting List"
+            variant={'outline'}
+            className="w-full hover:opacity-90"
+            type="button"
+          >
+            Join Waiting List
+          </Button>
+        }
+      />
+    )
+  }
+
   return (
     <Button
       aria-label="Add to cart"
@@ -172,9 +192,7 @@ export function AddToCart({ product }: Props) {
           ? 'Checkout Aktif'
           : isCheckingStock
             ? 'Checking Stock...'
-            : isOutOfStock
-              ? 'Stok Habis'
-              : 'Add To Cart'}
+            : 'Add To Cart'}
     </Button>
   )
 }

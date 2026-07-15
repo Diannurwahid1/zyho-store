@@ -1,5 +1,6 @@
 'use client'
 
+import { WaitlistDialog } from '@/components/WaitlistDialog'
 import { useActiveCheckout } from '@/hooks/useActiveCheckout'
 import { useCart } from '@payloadcms/plugin-ecommerce/client/react'
 import { useRouter } from 'next/navigation'
@@ -166,6 +167,14 @@ export function ProductCardActions({
     }
   }
 
+  if (isOutOfStock) {
+    return (
+      <div className={compact ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-1 gap-2'}>
+        <WaitlistDialog productId={productId} compact={compact} />
+      </div>
+    )
+  }
+
   return (
     <div className={compact ? 'grid grid-cols-1 gap-2 md:grid-cols-2' : 'grid grid-cols-2 gap-2'}>
       <button
@@ -174,7 +183,7 @@ export function ProductCardActions({
         onClick={handleBuyNow}
         type="button"
       >
-        {hasActiveCheckout ? labels.checkoutActive : isOutOfStock ? labels.soldOut : labels.buy}
+        {hasActiveCheckout ? labels.checkoutActive : labels.buy}
       </button>
       <button
         className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
@@ -182,7 +191,7 @@ export function ProductCardActions({
         onClick={handleAddToCart}
         type="button"
       >
-        {hasActiveCheckout ? labels.checkoutActive : isOutOfStock ? labels.soldOut : labels.add}
+        {hasActiveCheckout ? labels.checkoutActive : labels.add}
       </button>
     </div>
   )

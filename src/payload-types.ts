@@ -91,6 +91,8 @@ export interface Config {
     'email-templates': EmailTemplate;
     'stock-reservations': StockReservation;
     'stock-ledger': StockLedger;
+    waitlists: Waitlist;
+    'waitlist-entries': WaitlistEntry;
     forms: Form;
     'form-submissions': FormSubmission;
     addresses: Address;
@@ -111,6 +113,9 @@ export interface Config {
       orders: 'orders';
       cart: 'carts';
       addresses: 'addresses';
+    };
+    waitlists: {
+      entries: 'waitlist-entries';
     };
     variantTypes: {
       options: 'variantOptions';
@@ -143,6 +148,8 @@ export interface Config {
     'email-templates': EmailTemplatesSelect<false> | EmailTemplatesSelect<true>;
     'stock-reservations': StockReservationsSelect<false> | StockReservationsSelect<true>;
     'stock-ledger': StockLedgerSelect<false> | StockLedgerSelect<true>;
+    waitlists: WaitlistsSelect<false> | WaitlistsSelect<true>;
+    'waitlist-entries': WaitlistEntriesSelect<false> | WaitlistEntriesSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     addresses: AddressesSelect<false> | AddressesSelect<true>;
@@ -423,6 +430,42 @@ export interface Product {
         id?: string | null;
       }[]
     | null;
+  /**
+   * Panduan cara penggunaan produk ini. Akan ditampilkan di halaman order setelah pembayaran berhasil.
+   */
+  caraPenggunaan?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  /**
+   * Informasi garansi produk. Akan ditampilkan di halaman order setelah pembayaran berhasil.
+   */
+  garansi?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
   productFAQ?:
     | {
         question: string;
@@ -1609,6 +1652,62 @@ export interface EmailTemplate {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "waitlists".
+ */
+export interface Waitlist {
+  id: number;
+  /**
+   * Produk yang sedang habis stok dan dibuka waiting list.
+   */
+  product: number | Product;
+  status: 'active' | 'closed';
+  /**
+   * Opsional: Voucher diskon yang akan diberikan ke member waiting list saat stok tersedia kembali.
+   */
+  voucher?: (number | null) | Coupon;
+  /**
+   * Pesan custom yang dikirim saat stok tersedia. Gunakan {{name}}, {{product}}, {{voucher}} sebagai placeholder.
+   */
+  notifyMessage?: string | null;
+  entries?: {
+    docs?: (number | WaitlistEntry)[];
+    hasNextPage?: boolean;
+    totalDocs?: number;
+  };
+  totalEntries?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "waitlist-entries".
+ */
+export interface WaitlistEntry {
+  id: number;
+  waitlist: number | Waitlist;
+  /**
+   * User yang terdaftar (jika login).
+   */
+  customer?: (number | null) | User;
+  /**
+   * Nama customer (untuk guest atau display).
+   */
+  name?: string | null;
+  /**
+   * Nomor WhatsApp untuk notifikasi saat stok tersedia.
+   */
+  phone: string;
+  /**
+   * Jumlah unit yang diinginkan.
+   */
+  quantity: number;
+  status: 'waiting' | 'notified' | 'purchased' | 'cancelled';
+  notifiedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "form-submissions".
  */
 export interface FormSubmission {
@@ -1723,6 +1822,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'stock-ledger';
         value: number | StockLedger;
+      } | null)
+    | ({
+        relationTo: 'waitlists';
+        value: number | Waitlist;
+      } | null)
+    | ({
+        relationTo: 'waitlist-entries';
+        value: number | WaitlistEntry;
       } | null)
     | ({
         relationTo: 'forms';
@@ -2319,6 +2426,35 @@ export interface StockLedgerSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "waitlists_select".
+ */
+export interface WaitlistsSelect<T extends boolean = true> {
+  product?: T;
+  status?: T;
+  voucher?: T;
+  notifyMessage?: T;
+  entries?: T;
+  totalEntries?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "waitlist-entries_select".
+ */
+export interface WaitlistEntriesSelect<T extends boolean = true> {
+  waitlist?: T;
+  customer?: T;
+  name?: T;
+  phone?: T;
+  quantity?: T;
+  status?: T;
+  notifiedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "forms_select".
  */
 export interface FormsSelect<T extends boolean = true> {
@@ -2559,6 +2695,8 @@ export interface ProductsSelect<T extends boolean = true> {
         size?: T;
         id?: T;
       };
+  caraPenggunaan?: T;
+  garansi?: T;
   productFAQ?:
     | T
     | {
