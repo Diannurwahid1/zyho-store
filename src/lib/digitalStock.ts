@@ -110,6 +110,16 @@ export const createDigitalStockUnits = async ({
   return created
 }
 
+const isStandardDigitalProduct = (product: unknown) =>
+  Boolean(
+    product &&
+    typeof product === 'object' &&
+    'productType' in product &&
+    (product as { productType?: string | null }).productType &&
+    (!(product as { digitalFulfillmentMode?: string | null }).digitalFulfillmentMode ||
+      (product as { digitalFulfillmentMode?: string | null }).digitalFulfillmentMode === 'standard'),
+  )
+
 export const assignDigitalStockToOrder = async ({
   cartItems,
   customer,
@@ -131,8 +141,6 @@ export const assignDigitalStockToOrder = async ({
 
   for (const item of cartItems) {
     const product = item.product as Product | number | string | null | undefined
-    if (!isPerUnitDigitalStockProduct(product)) continue
-
     const productID = normalizeRelationID(product)
     if (!productID) continue
 
@@ -140,60 +148,138 @@ export const assignDigitalStockToOrder = async ({
     const quantity = Math.max(0, Number(item.quantity || 0))
     if (!quantity) continue
 
-    const availableUnits = await req.payload.find({
-      collection: 'digital-stock-units',
-      depth: 1,
-      limit: quantity,
-      overrideAccess: true,
-      pagination: false,
-      req,
-      sort: 'createdAt',
-      where: {
-        and: [
-          { product: { equals: productID } },
-          variantID ? { variant: { equals: String(variantID) } } : { variant: { exists: false } },
-          { status: { equals: 'available' } },
-        ],
-      },
-    })
-
-    if (availableUnits.docs.length < quantity) {
-      throw new Error(
-        `Stok unit digital untuk produk "${typeof product === 'object' && product ? product.title : productID}" kurang dari quantity order.`,
-      )
-    }
-
-    const assignedUnits = []
-
-    for (const unit of availableUnits.docs as Record<string, any>[]) {
-      const updatedUnit = await req.payload.update({
+    // === Mode 1: Per-unit digital stock ===
+    if (isPerUnitDigitalStockProduct(product)) {
+      const availableUnits = await req.payload.find({
         collection: 'digital-stock-units',
-        id: unit.id,
-        data: {
-          assignedAt: new Date().toISOString(),
-          customer: customerID || undefined,
-          order: orderID as any,
-          reservationId: `order:${orderID}`,
-          status: 'assigned',
-        } as any,
+        depth: 1,
+        limit: quantity,
         overrideAccess: true,
+        pagination: false,
         req,
+        sort: 'createdAt',
+        where: {
+          and: [
+            { product: { equals: productID } },
+            variantID ? { variant: { equals: String(variantID) } } : { variant: { exists: false } },
+            { status: { equals: 'available' } },
+          ],
+        },
       })
 
-      assignedUnits.push(buildDigitalUnitSnapshot(updatedUnit as Record<string, any>))
+      if (availableUnits.docs.length < quantity) {
+        throw new Error(
+          `Stok unit digital untuk produk "${typeof product === 'object' && product ? product.title : productID}" kurang dari quantity order.`,
+        )
+      }
+
+      const assignedUnits = []
+
+      for (const unit of availableUnits.docs as Record<string, any>[]) {
+        const updatedUnit = await req.payload.update({
+          collection: 'digital-stock-units',
+          id: unit.id,
+          data: {
+            assignedAt: new Date().toISOString(),
+            customer: customerID || undefined,
+            order: orderID as any,
+            reservationId: `order:${orderID}`,
+            status: 'assigned',
+          } as any,
+          overrideAccess: true,
+          req,
+        })
+
+        assignedUnits.push(buildDigitalUnitSnapshot(updatedUnit as Record<string, any>))
+      }
+
+      deliveries.push({
+        product: productID,
+        productTitle: typeof product === 'object' && product ? product.title : undefined,
+        quantity,
+        units: assignedUnits,
+        variant: variantID || undefined,
+        variantTitle:
+          item.variant && typeof item.variant === 'object' && 'title' in item.variant
+            ? item.variant.title
+            : undefined,
+      })
+
+      continue
     }
 
-    deliveries.push({
-      product: productID,
-      productTitle: typeof product === 'object' && product ? product.title : undefined,
-      quantity,
-      units: assignedUnits,
-      variant: variantID || undefined,
-      variantTitle:
-        item.variant && typeof item.variant === 'object' && 'title' in item.variant
-          ? item.variant.title
-          : undefined,
-    })
+    // === Mode 2: Standard digital delivery (DigitalAssets) ===
+    if (isStandardDigitalProduct(product)) {
+      const digitalAssets = await req.payload.find({
+        collection: 'digital-assets',
+        depth: 1,
+        limit: 50,
+        overrideAccess: true,
+        pagination: false,
+        req,
+        where: {
+          and: [
+            { product: { equals: productID } },
+            { status: { equals: 'active' } },
+          ],
+        },
+      })
+
+      if (digitalAssets.docs.length === 0) continue
+
+      const units: Record<string, any>[] = []
+
+      for (const asset of digitalAssets.docs as Record<string, any>[]) {
+        // Buat download-access record untuk customer
+        if (customerID) {
+          try {
+            await req.payload.create({
+              collection: 'download-access',
+              data: {
+                customer: customerID,
+                product: productID,
+                order: orderID,
+                asset: asset.id,
+                status: 'active',
+                maxDownloads: 10,
+                downloadCount: 0,
+              } as any,
+              overrideAccess: true,
+              req,
+            })
+          } catch (err) {
+            req.payload.logger.warn(
+              { err, assetId: asset.id },
+              '[DigitalStock] Gagal buat download-access',
+            )
+          }
+        }
+
+        // Tambahkan ke units snapshot untuk ditampilkan di order page
+        units.push({
+          deliveryType: 'file',
+          label: asset.fileName || 'Digital File',
+          file: asset.file || undefined,
+          referenceCode: asset.version ? `v${asset.version}` : undefined,
+        })
+      }
+
+      if (units.length > 0) {
+        deliveries.push({
+          product: productID,
+          productTitle: typeof product === 'object' && product ? product.title : undefined,
+          quantity,
+          units,
+          variant: variantID || undefined,
+          variantTitle:
+            item.variant && typeof item.variant === 'object' && 'title' in item.variant
+              ? item.variant.title
+              : undefined,
+        })
+      }
+
+      continue
+    }
   }
 
   if (deliveries.length === 0) {

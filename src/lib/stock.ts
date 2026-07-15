@@ -230,9 +230,16 @@ export async function confirmStockReservation(
     overrideAccess: true,
   })
 
-  // Kurangi inventory produk / variant
+  // NOTE: Inventory decrement sudah di-handle oleh @payloadcms/plugin-ecommerce
+  // di confirmOrder endpoint (via $inc). Kita TIDAK mengurangi inventory di sini
+  // untuk menghindari double deduction. Cukup tulis ledger saja.
+  const customerId = reservation.customer
+    ? typeof reservation.customer === 'object'
+      ? reservation.customer.id
+      : reservation.customer
+    : null
+
   if (variantId) {
-    // Kurangi inventory di variant
     try {
       const variantDoc = await payload.findByID({
         collection: 'variants' as any,
@@ -240,63 +247,44 @@ export async function confirmStockReservation(
         overrideAccess: true,
       })
       const currentInventory = (variantDoc as any)?.inventory ?? 0
-      const newInventory = Math.max(0, currentInventory - quantity)
-      await payload.update({
-        collection: 'variants' as any,
-        id: variantId,
-        data: { inventory: newInventory } as any,
-        overrideAccess: true,
-      })
       await writeLedger(payload, {
         productId,
         variantId,
         type: 'out',
         qty: -quantity,
         stockBefore: currentInventory,
-        stockAfter: newInventory,
+        stockAfter: Math.max(0, currentInventory - quantity),
         referenceId: reservationId,
         orderId,
-        customerId: reservation.customer
-          ? typeof reservation.customer === 'object'
-            ? reservation.customer.id
-            : reservation.customer
-          : null,
+        customerId,
         notes: `Stok keluar (terjual) — order #${orderId}`,
       })
     } catch (err) {
-      payload.logger.warn({ err, variantId }, '[Stock] Gagal update variant inventory')
+      payload.logger.warn({ err, variantId }, '[Stock] Gagal tulis ledger variant')
     }
   } else {
-    // Kurangi inventory di produk
-    const product = await payload.findByID({
-      collection: 'products',
-      id: productId,
-      overrideAccess: true,
-    })
-    const currentInventory = (product as any)?.inventory ?? 0
-    const newInventory = Math.max(0, currentInventory - quantity)
-    await payload.update({
-      collection: 'products',
-      id: productId,
-      data: { inventory: newInventory } as any,
-      overrideAccess: true,
-    })
-    await writeLedger(payload, {
-      productId,
-      variantId: null,
-      type: 'out',
-      qty: -quantity,
-      stockBefore: currentInventory,
-      stockAfter: newInventory,
-      referenceId: reservationId,
-      orderId,
-      customerId: reservation.customer
-        ? typeof reservation.customer === 'object'
-          ? reservation.customer.id
-          : reservation.customer
-        : null,
-      notes: `Stok keluar (terjual) — order #${orderId}`,
-    })
+    try {
+      const product = await payload.findByID({
+        collection: 'products',
+        id: productId,
+        overrideAccess: true,
+      })
+      const currentInventory = (product as any)?.inventory ?? 0
+      await writeLedger(payload, {
+        productId,
+        variantId: null,
+        type: 'out',
+        qty: -quantity,
+        stockBefore: currentInventory,
+        stockAfter: Math.max(0, currentInventory - quantity),
+        referenceId: reservationId,
+        orderId,
+        customerId,
+        notes: `Stok keluar (terjual) — order #${orderId}`,
+      })
+    } catch (err) {
+      payload.logger.warn({ err, productId }, '[Stock] Gagal tulis ledger product')
+    }
   }
 
   return { success: true }
