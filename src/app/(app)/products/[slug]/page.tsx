@@ -6,6 +6,17 @@ import { Gallery } from '@/components/product/Gallery'
 import { PolicyCard } from '@/components/product/PolicyCard'
 import { ProductDescription } from '@/components/product/ProductDescription'
 import { Button } from '@/components/ui/button'
+import { getCachedCurrencySettings } from '@/utilities/currencySettings'
+import { getClientLanguage } from '@/utilities/getClientLanguage'
+import {
+    CURRENCY_PREFERENCE_COOKIE,
+    getCurrencyCodeFromLanguage,
+    normalizeCurrencyCode,
+    resolveEnabledCurrencyCode,
+    resolveProductPrice,
+    resolveVariantPrice,
+} from '@/utilities/pricing'
+import { safeJsonForScript } from '@/utilities/safeJsonForScript'
 import configPromise from '@payload-config'
 import { ChevronLeftIcon } from 'lucide-react'
 import { Metadata } from 'next'
@@ -15,17 +26,6 @@ import { notFound } from 'next/navigation'
 import Script from 'next/script'
 import { getPayload } from 'payload'
 import React, { Suspense } from 'react'
-import { getClientLanguage } from '@/utilities/getClientLanguage'
-import { getCachedCurrencySettings } from '@/utilities/currencySettings'
-import {
-  CURRENCY_PREFERENCE_COOKIE,
-  getCurrencyCodeFromLanguage,
-  normalizeCurrencyCode,
-  resolveEnabledCurrencyCode,
-  resolveProductPrice,
-  resolveVariantPrice,
-} from '@/utilities/pricing'
-import { safeJsonForScript } from '@/utilities/safeJsonForScript'
 
 type Args = {
   params: Promise<{

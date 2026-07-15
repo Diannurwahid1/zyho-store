@@ -4,6 +4,7 @@ import type { Payload } from 'payload'
 import type { MemberTier } from '@/lib/member'
 
 type EligibleVoucherArgs = {
+  cartItems?: any[]
   cartSubtotal?: number
   payload: Payload
   user: Pick<User, 'id' | 'memberTier' | 'totalSpentIDR'>
@@ -12,6 +13,7 @@ type EligibleVoucherArgs = {
 export type EligibleVoucher = {
   allowedTiers: MemberTier[]
   amount: number
+  appliesTo?: 'all' | 'specific'
   benefitSummary: string
   code: string
   description: string
@@ -21,6 +23,7 @@ export type EligibleVoucher = {
   id: number
   minimumSpend: number
   perUserLimit: number
+  products?: number[]
   remainingGlobalUses: number | null
 }
 
@@ -118,7 +121,7 @@ export const getUserVoucherUsageCount = async (payload: Payload, userID: number,
   return docs.length
 }
 
-export const getEligibleVouchers = async ({ cartSubtotal, payload, user }: EligibleVoucherArgs) => {
+export const getEligibleVouchers = async ({ cartItems, cartSubtotal, payload, user }: EligibleVoucherArgs) => {
   const memberTier = (user.memberTier as MemberTier | null) || 'bronze'
   const { docs } = await payload.find({
     collection: 'coupons',
@@ -146,12 +149,26 @@ export const getEligibleVouchers = async ({ cartSubtotal, payload, user }: Eligi
       continue
     }
 
+    if (coupon.appliesTo === 'specific' && Array.isArray(coupon.products) && coupon.products.length > 0) {
+      if (cartItems) {
+        if (cartItems.length === 0) continue
+
+        const hasEligibleProduct = cartItems.some((item) => {
+          const productId = typeof item.product === 'object' ? item.product?.id : item.product
+          return productId && coupon.products?.includes(productId as number)
+        })
+
+        if (!hasEligibleProduct) continue
+      }
+    }
+
     const allowedTiers = Array.isArray(coupon.allowedTiers) ? coupon.allowedTiers : []
     const minimumSpend = coupon.minimumSpend || 0
 
     eligibleVouchers.push({
       allowedTiers: allowedTiers as MemberTier[],
       amount: coupon.amount,
+      appliesTo: coupon.appliesTo,
       benefitSummary: coupon.benefitSummary || 'Voucher member aktif untuk akun Anda.',
       code,
       description:
@@ -172,6 +189,7 @@ export const getEligibleVouchers = async ({ cartSubtotal, payload, user }: Eligi
       id: coupon.id,
       minimumSpend,
       perUserLimit: coupon.perUserLimit || 1,
+      products: Array.isArray(coupon.products) ? (coupon.products as number[]) : undefined,
       remainingGlobalUses:
         typeof coupon.usageLimit === 'number'
           ? Math.max(coupon.usageLimit - (coupon.usedCount || 0), 0)
@@ -183,11 +201,13 @@ export const getEligibleVouchers = async ({ cartSubtotal, payload, user }: Eligi
 }
 
 export const getVoucherByCodeForUser = async ({
+  cartItems,
   code,
   payload,
   subtotal,
   user,
 }: {
+  cartItems?: any[]
   code: string
   payload: Payload
   subtotal: number
@@ -200,6 +220,7 @@ export const getVoucherByCodeForUser = async ({
   }
 
   const eligibleVouchers = await getEligibleVouchers({
+    cartItems,
     cartSubtotal: subtotal,
     payload,
     user,

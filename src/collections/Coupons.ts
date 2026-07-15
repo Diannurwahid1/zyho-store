@@ -1,7 +1,7 @@
 import { adminOrManager } from '@/access/roles'
 import { generateVoucherCode, normalizeCouponCode, resolveCouponExpiry } from '@/lib/vouchers'
-import { sendVoucherBlastAfterChange } from './Coupons/hooks/sendVoucherBlast'
 import type { CollectionConfig } from 'payload'
+import { sendVoucherBlastAfterChange } from './Coupons/hooks/sendVoucherBlast'
 
 export const Coupons: CollectionConfig = {
   slug: 'coupons',
@@ -93,6 +93,26 @@ export const Coupons: CollectionConfig = {
     { name: 'code', type: 'text', required: true, unique: true, index: true },
     { name: 'discountType', type: 'select', options: ['percentage', 'fixed'], required: true },
     { name: 'amount', type: 'number', required: true, min: 0 },
+    {
+      name: 'appliesTo',
+      type: 'select',
+      defaultValue: 'all',
+      options: [
+        { label: 'Semua Produk', value: 'all' },
+        { label: 'Produk Tertentu', value: 'specific' },
+      ],
+      required: true,
+    },
+    {
+      name: 'products',
+      type: 'relationship',
+      relationTo: 'products',
+      hasMany: true,
+      admin: {
+        condition: (_, siblingData) => siblingData?.appliesTo === 'specific',
+        description: 'Pilih produk yang bisa menggunakan voucher ini.',
+      },
+    },
     {
       name: 'allowedTiers',
       type: 'select',

@@ -171,6 +171,7 @@ export const preparePaymentContext = async ({
 
   if (voucherCode) {
     eligibleVoucher = await getVoucherByCodeForUser({
+      cartItems,
       code: voucherCode,
       payload: req.payload,
       subtotal: subtotalBeforeDiscount,
@@ -231,6 +232,7 @@ export const buildInitiatePaymentPayload = async ({
   const voucherCode = normalizeCouponCode(rawData?.voucherCode)
   const eligibleVoucher = voucherCode
     ? await getVoucherByCodeForUser({
+        cartItems: scopedCartItems,
         code: voucherCode,
         payload: req.payload,
         subtotal,

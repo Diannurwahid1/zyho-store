@@ -87,8 +87,24 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
   )
 
   const eligibleVouchers = useMemo(
-    () => initialEligibleVouchers.filter((voucher) => checkoutSubtotal >= voucher.minimumSpend),
-    [checkoutSubtotal, initialEligibleVouchers],
+    () =>
+      initialEligibleVouchers.filter((voucher) => {
+        if (checkoutSubtotal < voucher.minimumSpend) return false
+
+        if (voucher.appliesTo === 'specific' && Array.isArray(voucher.products) && voucher.products.length > 0) {
+          if (checkoutItems.length === 0) return false
+
+          const hasEligibleProduct = checkoutItems.some((item) => {
+            const productId = typeof item.product === 'object' ? item.product?.id : item.product
+            return productId && voucher.products?.includes(Number(productId))
+          })
+
+          if (!hasEligibleProduct) return false
+        }
+
+        return true
+      }),
+    [checkoutItems, checkoutSubtotal, initialEligibleVouchers],
   )
 
   const normalizedProfilePhone = (user?.phone || '').trim()

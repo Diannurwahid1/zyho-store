@@ -1336,6 +1336,11 @@ export interface Coupon {
   code: string;
   discountType: 'percentage' | 'fixed';
   amount: number;
+  appliesTo: 'all' | 'specific';
+  /**
+   * Pilih produk yang bisa menggunakan voucher ini.
+   */
+  products?: (number | Product)[] | null;
   allowedTiers?: ('bronze' | 'silver' | 'gold' | 'diamond')[] | null;
   minimumSpend?: number | null;
   usageLimit?: number | null;
@@ -2292,6 +2297,8 @@ export interface CouponsSelect<T extends boolean = true> {
   code?: T;
   discountType?: T;
   amount?: T;
+  appliesTo?: T;
+  products?: T;
   allowedTiers?: T;
   minimumSpend?: T;
   usageLimit?: T;
