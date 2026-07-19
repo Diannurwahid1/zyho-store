@@ -33,9 +33,12 @@ async function writeLedger(
     customerId?: string | number | null
     performedById?: string | number | null
     notes?: string | null
+    costPerUnit?: number | null
   },
 ): Promise<void> {
   try {
+    const costPerUnit = opts.costPerUnit && opts.costPerUnit > 0 ? opts.costPerUnit : undefined
+    const totalCost = costPerUnit ? costPerUnit * Math.abs(opts.qty) : undefined
     await payload.create({
       collection: 'stock-ledger',
       data: {
@@ -50,6 +53,8 @@ async function writeLedger(
         customer: opts.customerId as any,
         performedBy: opts.performedById as any,
         notes: opts.notes || undefined,
+        costPerUnit,
+        totalCost,
       } as any,
       overrideAccess: true,
     })
@@ -416,9 +421,10 @@ export async function addStock(
     referenceId?: string | null
     performedById?: string | number | null
     notes?: string | null
+    costPerUnit?: number | null
   },
 ): Promise<{ success: boolean; newInventory: number; error?: string }> {
-  const { productId, variantId, quantity, type = 'in', referenceId, performedById, notes } = opts
+  const { productId, variantId, quantity, type = 'in', referenceId, performedById, notes, costPerUnit } = opts
 
   if (quantity === 0) return { success: false, newInventory: 0, error: 'Quantity tidak boleh 0' }
 
@@ -447,6 +453,7 @@ export async function addStock(
         referenceId,
         performedById,
         notes: notes || (type === 'in' ? 'Restock' : 'Penyesuaian manual'),
+        costPerUnit,
       })
       return { success: true, newInventory }
     } catch (err) {
@@ -476,6 +483,7 @@ export async function addStock(
       referenceId,
       performedById,
       notes: notes || (type === 'in' ? 'Restock' : 'Penyesuaian manual'),
+      costPerUnit,
     })
     return { success: true, newInventory }
   }

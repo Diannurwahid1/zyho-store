@@ -1,5 +1,5 @@
-import { releaseReservation, reserveStock } from '@/lib/stock'
 import { findActiveCheckoutSession } from '@/lib/checkoutSessionServer'
+import { releaseReservation, reserveStock } from '@/lib/stock'
 import configPromise from '@payload-config'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'

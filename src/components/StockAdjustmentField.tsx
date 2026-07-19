@@ -134,6 +134,7 @@ export const StockAdjustmentField: React.FC = () => {
   })
 
   const [adjustmentForm, setAdjustmentForm] = useState({
+    costPerUnit: '',
     notes: '',
     quantity: '',
     type: 'adjust' as 'in' | 'adjust',
@@ -214,6 +215,7 @@ export const StockAdjustmentField: React.FC = () => {
       variantName,
     })
     setAdjustmentForm({
+      costPerUnit: '',
       notes: '',
       quantity: '',
       type: 'adjust',
@@ -295,6 +297,9 @@ export const StockAdjustmentField: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          costPerUnit: adjustmentForm.costPerUnit
+            ? Number(adjustmentForm.costPerUnit)
+            : undefined,
           digitalUnits: requiresDigitalUnits
             ? digitalUnits.map((unit) => ({
                 accountEmail: unit.accountEmail || undefined,
@@ -881,6 +886,32 @@ export const StockAdjustmentField: React.FC = () => {
                           <option value="in">Restock (in)</option>
                           <option value="adjust">Adjustment (adjust)</option>
                         </select>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="modal-cost">Modal / Harga Beli per Unit (Rp)</Label>
+                        <Input
+                          id="modal-cost"
+                          type="number"
+                          min="0"
+                          value={adjustmentForm.costPerUnit}
+                          onChange={(e) =>
+                            setAdjustmentForm({ ...adjustmentForm, costPerUnit: e.target.value })
+                          }
+                          placeholder="Contoh: 50000"
+                          style={inputBoxStyle}
+                        />
+                        <p
+                          style={{
+                            fontSize: '0.78rem',
+                            color: 'var(--theme-text-dimmed)',
+                            marginTop: '0.4rem',
+                          }}
+                        >
+                          {adjustmentForm.costPerUnit && positiveQuantity > 0
+                            ? `Total pengeluaran: Rp ${(Number(adjustmentForm.costPerUnit) * positiveQuantity).toLocaleString('id-ID')}`
+                            : 'Opsional. Isi untuk mencatat pengeluaran modal saat restock.'}
+                        </p>
                       </div>
 
                       <div>

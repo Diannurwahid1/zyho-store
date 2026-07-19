@@ -24,7 +24,7 @@ export const StockLedger: CollectionConfig = {
   admin: {
     group: 'Commerce',
     useAsTitle: 'referenceId',
-    defaultColumns: ['createdAt', 'product', 'type', 'qty', 'stockAfter', 'referenceId'],
+    defaultColumns: ['createdAt', 'product', 'type', 'qty', 'stockAfter', 'costPerUnit', 'totalCost', 'referenceId'],
     description: 'Kartu stok permanen — riwayat semua perubahan inventory produk.',
     listSearchableFields: ['referenceId', 'notes'],
   },
@@ -124,6 +124,21 @@ export const StockLedger: CollectionConfig = {
       index: true,
       admin: {
         description: 'Admin/staff yang melakukan perubahan (untuk penyesuaian manual).',
+      },
+    },
+    {
+      name: 'costPerUnit',
+      type: 'number',
+      admin: {
+        description: 'Harga modal per unit (Rp). Diisi saat restock untuk mencatat pengeluaran.',
+      },
+    },
+    {
+      name: 'totalCost',
+      type: 'number',
+      admin: {
+        description: 'Total pengeluaran modal (costPerUnit × qty). Otomatis dihitung.',
+        readOnly: true,
       },
     },
     {

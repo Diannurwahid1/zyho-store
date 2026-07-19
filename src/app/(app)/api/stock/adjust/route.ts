@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { digitalUnits, productId, variantId, quantity, type = 'adjust', notes } = body
+    const { digitalUnits, productId, variantId, quantity, type = 'adjust', notes, costPerUnit } = body
     const normalizedProductID = normalizeProductID(productId)
     const normalizedVariantID =
       typeof variantId === 'string' && variantId.trim().length > 0 ? variantId.trim() : null
@@ -117,6 +117,7 @@ export async function POST(req: NextRequest) {
       type,
       notes: notes || (quantity > 0 ? 'Manual restock' : 'Manual adjustment'),
       performedById: user.id,
+      costPerUnit: typeof costPerUnit === 'number' && costPerUnit > 0 ? costPerUnit : null,
     })
 
     if (!result.success) {
