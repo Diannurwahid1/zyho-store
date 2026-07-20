@@ -41,7 +41,7 @@ import { Header } from '@/globals/Header'
 import { Settings } from '@/globals/Settings'
 import { StockAdjustment } from '@/globals/StockAdjustment'
 import { plugins } from './plugins'
-import { WaitlistBlastPage } from '@/app/(payload)/waitlist-blast/page'
+import WaitlistBlastPage from '@/app/(payload)/waitlist-blast/page'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
