@@ -65,6 +65,7 @@ export default buildConfig({
       beforeDashboard: ['@/components/BeforeDashboard#BeforeDashboard'],
       afterNavLinks: [
         {
+          type: 'link',
           label: 'WhatsApp Blast',
           href: '/mlebu/waitlist-blast',
         },
