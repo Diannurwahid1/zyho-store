@@ -41,6 +41,7 @@ import { Header } from '@/globals/Header'
 import { Settings } from '@/globals/Settings'
 import { StockAdjustment } from '@/globals/StockAdjustment'
 import { plugins } from './plugins'
+import { WaitlistBlastPage } from '@/app/(payload)/waitlist-blast/page'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -62,7 +63,16 @@ export default buildConfig({
       // The `BeforeDashboard` component renders the 'welcome' block that you see after logging into your admin panel.
       // Feel free to delete this at any time. Simply remove the line below and the import `BeforeDashboard` statement on line 15.
       beforeDashboard: ['@/components/BeforeDashboard#BeforeDashboard'],
-      afterNavLinks: ['@/components/AdminReportsNavLink#AdminReportsNavLink'],
+      afterNavLinks: [
+        {
+          label: 'WhatsApp Blast',
+          href: '/mlebu/waitlist-blast',
+        },
+        {
+          label: 'WhatsApp Blast',
+          href: '/waitlist-blast',
+        },
+      ],
       graphics: {
         Icon: '@/components/Logo/Logo#Icon',
         Logo: '@/components/Logo/Logo#Logo',
