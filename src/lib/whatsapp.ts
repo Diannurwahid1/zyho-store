@@ -1,5 +1,5 @@
-import { getServerSideURL } from '@/utilities/getURL'
 import type { Coupon, Media, User } from '@/payload-types'
+import { getServerSideURL } from '@/utilities/getURL'
 import type { Payload } from 'payload'
 
 const WA_BLAST_API_URL = process.env.WA_BLAST_API_URL || ''
@@ -363,5 +363,150 @@ export const sendVoucherBlast = async ({
     failed,
     sent,
     total: recipients.length,
+  }
+}
+
+export const buildWaitlistNotificationMessage = ({
+  productName,
+  productUrl,
+  customerName,
+  voucherCode,
+  customMessage,
+}: {
+  productName: string
+  productUrl: string
+  customerName?: string
+  voucherCode?: string
+  customMessage?: string
+}) => {
+  const name = customerName?.trim() || 'Kak'
+  
+  if (customMessage) {
+    return customMessage
+      .replace(/\{\{name\}\}/g, name)
+      .replace(/\{\{product\}\}/g, productName)
+      .replace(/\{\{voucher\}\}/g, voucherCode || '')
+      .replace(/\{\{url\}\}/g, productUrl)
+  }
+
+  const voucherText = voucherCode 
+    ? `\n\n🎁 *Bonus Spesial!*\nGunakan kode voucher: *${voucherCode}* untuk mendapatkan diskon eksklusif.`
+    : ''
+
+  return [
+    `Halo ${name},`,
+    '',
+    `Kabar baik! Produk yang Anda tunggu sekarang sudah tersedia kembali:`,
+    '',
+    `📦 *${productName}*`,
+    ``,
+    `Buruan order sekarang sebelum habis lagi!`,
+    voucherText,
+    '',
+    `Lihat produk: ${productUrl}`,
+    '',
+    'Terima kasih sudah sabar menunggu! 🙏',
+  ].join('\n')
+}
+
+export const sendWaitlistBlast = async ({
+  waitlistId,
+  payload,
+}: {
+  waitlistId: number | string
+  payload: Payload
+}) => {
+  // Fetch waitlist with entries
+  const waitlist = await payload.findByID({
+    collection: 'waitlists',
+    id: waitlistId,
+    depth: 2,
+    overrideAccess: true,
+  })
+
+  if (!waitlist) {
+    throw new Error('Waitlist not found')
+  }
+
+  const product = typeof waitlist.product === 'object' ? waitlist.product : null
+  if (!product) {
+    throw new Error('Product not found')
+  }
+
+  const productUrl = `${getServerSideURL()}/products/${product.slug}`
+  const voucher = waitlist.voucher && typeof waitlist.voucher === 'object' ? waitlist.voucher : null
+  const voucherCode = voucher?.code
+
+  // Fetch all entries for this waitlist
+  const { docs: entries } = await payload.find({
+    collection: 'waitlist-entries',
+    where: {
+      waitlist: {
+        equals: waitlistId,
+      },
+      status: {
+        not_equals: 'notified',
+      },
+    },
+    limit: 1000,
+    overrideAccess: true,
+  })
+
+  let sent = 0
+  let failed = 0
+  const notifiedIds: Array<number | string> = []
+
+  for (const entry of entries) {
+    if (!entry.phone) continue
+
+    const message = buildWaitlistNotificationMessage({
+      productName: product.title,
+      productUrl,
+      customerName: entry.name ?? undefined,
+      voucherCode,
+      customMessage: waitlist.notifyMessage ?? undefined,
+    })
+
+    const result = await sendWhatsAppText(entry.phone, message)
+
+    if (result.success) {
+      sent += 1
+      notifiedIds.push(entry.id)
+    } else {
+      failed += 1
+      payload.logger.error(
+        {
+          entryId: entry.id,
+          error: result.error,
+          phone: entry.phone,
+          waitlistId,
+        },
+        '[WhatsApp] Waitlist notification failed',
+      )
+    }
+
+    await wait(2500)
+  }
+
+  // Update notified entries
+  for (const entryId of notifiedIds) {
+    try {
+      await payload.update({
+        collection: 'waitlist-entries',
+        id: entryId,
+        data: {
+          status: 'notified',
+        },
+        overrideAccess: true,
+      })
+    } catch (err) {
+      payload.logger.warn({ err, entryId }, '[Waitlist] Failed to update entry status')
+    }
+  }
+
+  return {
+    failed,
+    sent,
+    total: entries.length,
   }
 }

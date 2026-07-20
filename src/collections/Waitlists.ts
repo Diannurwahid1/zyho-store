@@ -77,5 +77,15 @@ export const Waitlists: CollectionConfig = {
         position: 'sidebar',
       },
     },
+    {
+      name: 'blastAction',
+      type: 'ui',
+      admin: {
+        components: {
+          Field: '@/collections/Waitlists/BlastField#WaitlistBlastField',
+        },
+        position: 'sidebar',
+      },
+    },
   ],
 }
