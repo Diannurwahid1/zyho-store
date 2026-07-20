@@ -244,6 +244,12 @@ export async function GET(req: NextRequest) {
     const unitsRestocked = (ledgerIn.docs as any[]).reduce((sum, e) => sum + Math.abs(e.qty ?? 0), 0)
     const unitsSold = (ledgerOut.docs as any[]).reduce((sum, e) => sum + Math.abs(e.qty ?? 0), 0)
 
+    // Total modal keluar = sum totalCost dari semua entri restock/adjust
+    const totalModalKeluar = (ledgerIn.docs as any[]).reduce((sum, e) => {
+      const cost = e.totalCost ?? (e.costPerUnit ? Math.abs(e.qty ?? 0) * e.costPerUnit : 0)
+      return sum + cost
+    }, 0)
+
     // -----------------------------------------------------------------------
     // 5. New customers dalam periode
     // -----------------------------------------------------------------------
@@ -276,6 +282,7 @@ export async function GET(req: NextRequest) {
       stock: {
         unitsSold,
         unitsRestocked,
+        totalModalKeluar,
       },
       customers: {
         new: newCustomers.totalDocs,

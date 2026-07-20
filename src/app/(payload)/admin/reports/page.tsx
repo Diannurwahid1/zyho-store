@@ -41,7 +41,7 @@ interface SummaryData {
   }
   avgOrderValue: number
   transactions: { total: number; byStatus: Record<string, number> }
-  stock: { unitsSold: number; unitsRestocked: number }
+  stock: { unitsSold: number; unitsRestocked: number; totalModalKeluar: number }
   customers: { new: number }
   dailySeries: { date: string; revenue: number; orders: number }[]
 }
@@ -551,6 +551,22 @@ export default function ReportsPage() {
                 <StatCard label="Refund / Keluar" value={fmt(summary.cashflow.refund)} icon={ArrowDownLeft} iconColor="#ef4444" />
                 <StatCard label="Net" value={fmt(summary.cashflow.net)} icon={Wallet} trend={summary.cashflow.net >= 0 ? 'up' : 'down'} />
                 <StatCard label="Tx Terkonfirmasi" value={fmtNum(summary.cashflow.txConfirmed)} icon={CreditCard} />
+                <StatCard
+                  label="Modal Restock"
+                  value={fmt(summary.stock.totalModalKeluar ?? 0)}
+                  sub="pengeluaran beli stok"
+                  icon={Package}
+                  trend="down"
+                  iconColor="#f59e0b"
+                />
+                <StatCard
+                  label="Laba Kotor"
+                  value={fmt(summary.cashflow.net - (summary.stock.totalModalKeluar ?? 0))}
+                  sub={`Revenue − Refund − Modal`}
+                  icon={TrendingUp}
+                  trend={(summary.cashflow.net - (summary.stock.totalModalKeluar ?? 0)) >= 0 ? 'up' : 'down'}
+                  iconColor={(summary.cashflow.net - (summary.stock.totalModalKeluar ?? 0)) >= 0 ? '#22c55e' : '#ef4444'}
+                />
               </div>
 
               {/* Daily Chart */}
@@ -786,6 +802,14 @@ export default function ReportsPage() {
                   sub="restock & adjustment"
                   icon={TrendingUp}
                   iconColor="#22c55e"
+                />
+                <StatCard
+                  label="Total Modal Restock"
+                  value={fmt(summary.stock.totalModalKeluar ?? 0)}
+                  sub="dari costPerUnit × qty"
+                  icon={Package}
+                  trend="down"
+                  iconColor="#f59e0b"
                 />
               </div>
 

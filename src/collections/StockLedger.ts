@@ -149,5 +149,20 @@ export const StockLedger: CollectionConfig = {
       },
     },
   ],
+  hooks: {
+    beforeChange: [
+      ({ data }) => {
+        // Auto-hitung totalCost = costPerUnit × |qty|
+        const cost = Number(data.costPerUnit ?? 0)
+        const qty = Math.abs(Number(data.qty ?? 0))
+        if (cost > 0 && qty > 0) {
+          data.totalCost = cost * qty
+        } else {
+          data.totalCost = null
+        }
+        return data
+      },
+    ],
+  },
   timestamps: true,
 }
