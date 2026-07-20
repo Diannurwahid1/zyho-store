@@ -82,7 +82,7 @@ export const Waitlists: CollectionConfig = {
       type: 'ui',
       admin: {
         components: {
-          Field: './Waitlists/BlastField',
+          Field: '@/collections/Waitlists/BlastField#WaitlistBlastField',
         },
         position: 'sidebar',
       },
