@@ -8,7 +8,7 @@ const paymentMethods = [
     badge: 'VA',
     height: 16,
     label: 'BCA',
-    src: '/media/payments/bca.png',
+    src: '/media/payments/Bank_Central_Asia.svg.webp',
     width: 64,
   },
   {
@@ -16,7 +16,7 @@ const paymentMethods = [
     badge: 'VA',
     height: 18,
     label: 'BNI',
-    src: '/media/payments/bni.png',
+    src: '/media/payments/bni-logo.png',
     width: 46,
   },
   {

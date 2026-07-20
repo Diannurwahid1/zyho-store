@@ -1,7 +1,7 @@
 'use client'
 
-import React from 'react'
 import { WaitlistBlastButton } from '@/components/WaitlistBlastButton'
+import React from 'react'
 
 const WaitlistBlastPage: React.FC = () => {
   return (
