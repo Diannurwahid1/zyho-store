@@ -65,10 +65,6 @@ export default buildConfig({
       // Feel free to delete this at any time. Simply remove the line below and the import `BeforeDashboard` statement on line 15.
       beforeDashboard: ['@/components/BeforeDashboard#BeforeDashboard'],
       afterNavLinks: [
-        {
-          label: 'WhatsApp Blast',
-          href: '/waitlist-blast',
-        },
       ],
       graphics: {
         Icon: '@/components/Logo/Logo#Icon',
