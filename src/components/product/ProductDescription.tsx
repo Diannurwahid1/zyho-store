@@ -2,6 +2,7 @@
 import type { Product, Variant } from '@/payload-types'
 
 import { AddToCart } from '@/components/Cart/AddToCart'
+import { DiscountedPrice } from '@/components/DiscountedPrice'
 import { Price } from '@/components/Price'
 import { RichText } from '@/components/RichText'
 import { gaViewItem } from '@/utilities/googleAnalytics'
@@ -80,7 +81,12 @@ export function ProductDescription({ product }: { product: Product }) {
           {hasVariants ? (
             <Price highestAmount={highestAmount} lowestAmount={lowestAmount} />
           ) : (
-            <Price amount={amount} />
+            <DiscountedPrice 
+              productId={product.id}
+              priceInIDR={product.priceInIDR ?? undefined}
+              priceInUSD={product.priceInUSD ?? undefined}
+              showDiscountBadge={true}
+            />
           )}
         </div>
       </div>

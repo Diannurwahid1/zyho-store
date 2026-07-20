@@ -1,6 +1,6 @@
 'use client'
 
-import { LocalizedPrice } from '@/components/LocalizedPrice'
+import { DiscountedPrice } from '@/components/DiscountedPrice'
 import { ProductCardActions } from '@/components/ProductCardActions'
 import { cn } from '@/utilities/cn'
 import { useCurrency } from '@payloadcms/plugin-ecommerce/client/react'
@@ -133,12 +133,13 @@ export const ProductShowcase: React.FC<ProductShowcaseProps> = ({
                 <p className="mb-3 line-clamp-2 text-xs text-muted-foreground">{product.description}</p>
 
                 <div className="mb-3 flex items-center justify-between">
-                  <LocalizedPrice
+                  <DiscountedPrice
                     as="span"
                     className="text-sm font-bold text-card-foreground md:text-lg"
-                    currencyCode={currency.code === 'USD' ? 'USD' : 'IDR'}
+                    productId={product.id}
                     priceInIDR={product.priceInIDR}
                     priceInUSD={product.priceInUSD}
+                    showDiscountBadge={true}
                   />
                 </div>
 

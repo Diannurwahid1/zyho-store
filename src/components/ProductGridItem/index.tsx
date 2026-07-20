@@ -1,6 +1,6 @@
 import type { Product } from '@/payload-types'
 
-import { LocalizedPrice } from '@/components/LocalizedPrice'
+import { DiscountedPrice } from '@/components/DiscountedPrice'
 import { Media } from '@/components/Media'
 import { ProductCardActions } from '@/components/ProductCardActions'
 import clsx from 'clsx'
@@ -80,7 +80,12 @@ export const ProductGridItem: React.FC<Props> = ({ product }) => {
 
           {typeof price === 'number' && (
             <div className="shrink-0 text-[10px] font-semibold md:text-base">
-              <LocalizedPrice priceInIDR={priceIDR} priceInUSD={price} />
+              <DiscountedPrice 
+                productId={product.id || 0}
+                priceInIDR={priceIDR ?? undefined} 
+                priceInUSD={price ?? undefined}
+                showDiscountBadge={true}
+              />
             </div>
           )}
         </div>

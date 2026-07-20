@@ -1,10 +1,11 @@
-import { pakasirAdapterClient } from '@/payments/pakasir/client'
-import { nowpaymentsAdapterClient } from '@/payments/nowpayments/client'
 import { CurrencyInitializer } from '@/components/CurrencyInitializer'
+import { nowpaymentsAdapterClient } from '@/payments/nowpayments/client'
+import { pakasirAdapterClient } from '@/payments/pakasir/client'
 import { AuthProvider } from '@/providers/Auth'
 import { EcommerceProvider } from '@payloadcms/plugin-ecommerce/client/react'
 import React from 'react'
 
+import { ActiveVouchersProvider } from '@/providers/ActiveVouchers'
 import { SonnerProvider } from '@/providers/Sonner'
 import { HeaderThemeProvider } from './HeaderTheme'
 import { ThemeProvider } from './Theme'
@@ -64,8 +65,10 @@ export const Providers: React.FC<{
               nowpaymentsAdapterClient(),
             ]}
           >
-            <CurrencyInitializer currencyCode={initialCurrencyCode} usdEnabled={usdEnabled} />
-            {children}
+            <ActiveVouchersProvider>
+              <CurrencyInitializer currencyCode={initialCurrencyCode} usdEnabled={usdEnabled} />
+              {children}
+            </ActiveVouchersProvider>
           </EcommerceProvider>
         </HeaderThemeProvider>
       </AuthProvider>
