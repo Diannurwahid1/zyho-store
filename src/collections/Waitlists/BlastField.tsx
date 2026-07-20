@@ -1,8 +1,7 @@
 'use client'
 import { WaitlistBlastButton } from '@/components/WaitlistBlastButton'
-import React from 'react'
 
-export const WaitlistBlastField: React.FC<any> = (props) => {
+export default function WaitlistBlastField(props: any) {
   const waitlistId = props?.id || props?.data?.id
   if (!waitlistId) return null
   return <WaitlistBlastButton waitlistId={waitlistId} />
