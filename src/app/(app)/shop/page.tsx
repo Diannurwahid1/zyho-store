@@ -37,6 +37,7 @@ export default async function ShopPage({ searchParams }: Props) {
       priceInUSD: true,
       shortDescription: true,
       badge: true,
+      soldCount: true,
     },
     ...(normalizedSort ? { sort: normalizedSort } : { sort: 'title' }),
     ...(normalizedSearchValue || normalizedCategory
