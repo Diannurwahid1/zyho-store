@@ -89,6 +89,39 @@ export const getAbsoluteMediaURL = (media?: Media | null) => {
   return `${getServerSideURL()}${media.url}`
 }
 
+const sendSingleWhatsAppRequest = async (
+  message: WhatsAppMessagePayload,
+): Promise<WhatsAppSendResult> => {
+  try {
+    const response = await fetch(`${WA_BLAST_API_URL}/messages?sessionId=${WA_BLAST_SESSION_ID}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${WA_BLAST_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(message),
+    })
+
+    const result = await response.json().catch(() => ({}))
+    // API returns array or single object
+    const row = Array.isArray(result) ? result[0] : result
+    const success = response.ok && (row?.status === 'success' || row?.messageId)
+
+    return {
+      error: success ? undefined : row?.message || `HTTP ${response.status}`,
+      messageId: row?.messageId || row?.id,
+      recipient: message.to,
+      success: !!success,
+    }
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to send WhatsApp message.',
+      recipient: message.to,
+      success: false,
+    }
+  }
+}
+
 const sendWhatsAppRequest = async (
   body: WhatsAppMessagePayload | WhatsAppMessagePayload[],
 ): Promise<WhatsAppSendResult[]> => {
@@ -120,44 +153,15 @@ const sendWhatsAppRequest = async (
     }))
   }
 
-  try {
-    const response = await fetch(`${WA_BLAST_API_URL}/messages?sessionId=${WA_BLAST_SESSION_ID}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${WA_BLAST_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    })
-
-    const result = await response.json().catch(() => ({}))
-    const rows = Array.isArray(result) ? result : [result]
-
-    return recipients.map((recipient, index) => {
-      const row = rows[index] || rows[0] || {}
-      const success = response.ok || row?.status === 'success'
-      const errorMessage =
-        row?.message ||
-        result?.message ||
-        result?.error ||
-        `Failed to send WhatsApp message (HTTP ${response.status}).`
-
-      return {
-        error: success ? undefined : errorMessage,
-        messageId: row?.messageId || row?.id,
-        recipient,
-        success,
-      }
-    })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to send WhatsApp message.'
-
-    return recipients.map((recipient) => ({
-      error: message,
-      recipient,
-      success: false,
-    }))
+  // Send each message individually (API only accepts single object per request)
+  const results: WhatsAppSendResult[] = []
+  for (const message of messages) {
+    const result = await sendSingleWhatsAppRequest(message)
+    results.push(result)
+    // Small delay between messages to avoid rate limiting
+    if (messages.length > 1) await wait(500)
   }
+  return results
 }
 
 export const sendWhatsAppText = async (phone: string, message: string) => {
