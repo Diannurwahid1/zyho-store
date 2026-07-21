@@ -12,7 +12,8 @@ type Props = {
 }
 
 export const ProductGridItem: React.FC<Props> = ({ product }) => {
-  const { badge, gallery, priceInUSD, priceInIDR, shortDescription, soldCount, title } = product
+  const { badge, gallery, priceInUSD, priceInIDR, shortDescription, title } = product
+  const soldCount = (product as any).soldCount as number | undefined
 
   let price = priceInUSD
   let priceIDR = priceInIDR
