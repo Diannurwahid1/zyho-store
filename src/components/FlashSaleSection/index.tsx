@@ -2,10 +2,10 @@
 
 import { Price } from '@/components/Price'
 import type { SupportedCurrencyCode } from '@/utilities/pricing'
+import { useCurrency } from '@payloadcms/plugin-ecommerce/client/react'
 import { ArrowRight, Clock, Flame, Zap } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useCurrency } from '@payloadcms/plugin-ecommerce/client/react'
 import { useEffect, useState } from 'react'
 
 interface FlashSaleProduct {
