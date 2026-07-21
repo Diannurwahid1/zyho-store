@@ -12,7 +12,7 @@ type Props = {
 }
 
 export const ProductGridItem: React.FC<Props> = ({ product }) => {
-  const { badge, gallery, priceInUSD, priceInIDR, shortDescription, title } = product
+  const { badge, gallery, priceInUSD, priceInIDR, shortDescription, soldCount, title } = product
 
   let price = priceInUSD
   let priceIDR = priceInIDR
@@ -97,6 +97,12 @@ export const ProductGridItem: React.FC<Props> = ({ product }) => {
         ) : (
           <p className="hidden line-clamp-2 text-sm leading-6 text-muted-foreground md:block">
             Produk digital siap pakai dengan akses download aman setelah pembayaran.
+          </p>
+        )}
+
+        {typeof soldCount === 'number' && soldCount > 0 && (
+          <p className="text-[9px] text-muted-foreground md:text-xs">
+            <span className="font-medium text-foreground">{soldCount.toLocaleString('id-ID')}</span> terjual
           </p>
         )}
 

@@ -17,6 +17,7 @@ interface ShowcaseProduct {
   image: string
   description: string
   inventory?: number
+  soldCount?: number
   enableVariants?: boolean
   variants?: {
     id: number
@@ -131,6 +132,12 @@ export const ProductShowcase: React.FC<ProductShowcaseProps> = ({
                   </h3>
                 </Link>
                 <p className="mb-3 line-clamp-2 text-xs text-muted-foreground">{product.description}</p>
+
+                {typeof product.soldCount === 'number' && product.soldCount > 0 && (
+                  <p className="mb-2 text-[10px] text-muted-foreground">
+                    <span className="font-medium text-card-foreground">{product.soldCount.toLocaleString('id-ID')}</span> terjual
+                  </p>
+                )}
 
                 <div className="mb-3 flex items-center justify-between">
                   <DiscountedPrice

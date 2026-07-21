@@ -65,6 +65,7 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
     priceInUSD: true,
     priceInIDR: true,
     inventory: true,
+    soldCount: true,
     meta: true,
   },
   fields: [
@@ -275,6 +276,16 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
             { name: 'refundPolicy', type: 'textarea' },
             { name: 'isFeatured', type: 'checkbox', defaultValue: false },
             { name: 'badge', type: 'select', options: ['new', 'best_seller', 'discount'] },
+            {
+              name: 'soldCount',
+              type: 'number',
+              label: 'Jumlah Terjual',
+              defaultValue: 0,
+              min: 0,
+              admin: {
+                description: 'Jumlah produk yang sudah terjual. Bisa diinput manual untuk ditampilkan di storefront.',
+              },
+            },
             {
               name: 'digitalAssets',
               type: 'join',

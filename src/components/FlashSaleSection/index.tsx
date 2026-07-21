@@ -14,6 +14,7 @@ interface FlashSaleProduct {
   slug: string
   priceInUSD: number
   priceInIDR?: number
+  soldCount?: number
   promo?: {
     isFlashSale?: boolean
     discountPercent?: number
@@ -197,6 +198,12 @@ export function FlashSaleSection({ language = 'en' }: FlashSaleSectionProps) {
                     <h3 className="text-base font-semibold text-white mb-2 line-clamp-2 group-hover:text-red-400 transition-colors">
                       {product.title}
                     </h3>
+
+                    {typeof product.soldCount === 'number' && product.soldCount > 0 && (
+                      <p className="mb-2 text-xs text-neutral-400">
+                        <span className="font-medium text-neutral-200">{product.soldCount.toLocaleString('id-ID')}</span> terjual
+                      </p>
+                    )}
 
                     <div className="mt-auto pt-3 border-t border-neutral-800 flex items-center justify-between">
                       <div>

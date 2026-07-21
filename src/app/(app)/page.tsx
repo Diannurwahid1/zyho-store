@@ -114,6 +114,7 @@ export default async function Page() {
       priceInIDR: typeof product.priceInIDR === 'number' ? product.priceInIDR : undefined,
       priceInUSD: typeof product.priceInUSD === 'number' ? product.priceInUSD : undefined,
       inventory: product.inventory || 0,
+      soldCount: typeof product.soldCount === 'number' ? product.soldCount : 0,
       enableVariants: product.enableVariants || false,
       variants: product.variants?.docs
         ?.filter((variant) => typeof variant === 'object' && variant !== null)
