@@ -1,4 +1,9 @@
-import { formatWhatsAppNumber, isWhatsAppConfigured, sendWhatsAppText } from '@/lib/whatsapp'
+import {
+  formatWhatsAppNumber,
+  getWhatsAppSessionStatus,
+  isWhatsAppConfigured,
+  sendWhatsAppText,
+} from '@/lib/whatsapp'
 import configPromise from '@payload-config'
 import { headers as getHeaders } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
@@ -30,11 +35,21 @@ export async function POST(req: NextRequest) {
   }
 
   if (!isWhatsAppConfigured()) {
-    // If WA not configured, skip verification but still accept
     return NextResponse.json({
       success: true,
       skipped: true,
       message: 'Verifikasi dilewati (WhatsApp tidak dikonfigurasi).',
+    })
+  }
+
+  // Check if WA session is connected before attempting to send
+  const sessionStatus = await getWhatsAppSessionStatus()
+  if (!sessionStatus.success || !sessionStatus.isConnected) {
+    // Session disconnected — skip verification, accept the number with format check only
+    return NextResponse.json({
+      success: true,
+      skipped: true,
+      message: 'Verifikasi dilewati (sesi WhatsApp sedang offline). Nomor diterima berdasarkan format.',
     })
   }
 
