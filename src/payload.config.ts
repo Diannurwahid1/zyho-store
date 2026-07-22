@@ -22,6 +22,7 @@ import { DigitalStockUnits } from '@/collections/DigitalStockUnits'
 import { DownloadAccess } from '@/collections/DownloadAccess'
 import { DownloadLogs } from '@/collections/DownloadLogs'
 import { EmailTemplates } from '@/collections/EmailTemplates'
+import { Expenses } from '@/collections/Expenses'
 import { Licenses } from '@/collections/Licenses'
 import { Media } from '@/collections/Media'
 import { Pages } from '@/collections/Pages'
@@ -99,6 +100,7 @@ export default buildConfig({
     StockLedger,
     Waitlists,
     WaitlistEntries,
+    Expenses,
   ],
   db: postgresAdapter({
     pool: {
