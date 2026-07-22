@@ -627,8 +627,16 @@ export const emailWaitlistBlast = async ({
     overrideAccess: true,
   })
 
-  // Filter entries that have email
-  const emailEntries = entries.filter((e) => e.email?.trim())
+  // Filter entries that have email (from customer relation)
+  const emailEntries = entries
+    .map((e) => {
+      const customer = typeof e.customer === 'object' ? e.customer : null
+      return {
+        ...e,
+        email: customer?.email,
+      }
+    })
+    .filter((e) => e.email?.trim())
 
   if (emailEntries.length === 0) {
     return { sent: 0, failed: 0, total: 0 }
