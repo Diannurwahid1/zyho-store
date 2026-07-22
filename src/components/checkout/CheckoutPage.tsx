@@ -1,5 +1,6 @@
 'use client'
 
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton'
 import { CheckoutForm } from '@/components/forms/CheckoutForm'
 import { FormItem } from '@/components/forms/FormItem'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
@@ -20,6 +21,7 @@ import type { EligibleVoucher } from '@/lib/vouchers'
 import { Address } from '@/payload-types'
 import { useAuth } from '@/providers/Auth'
 import { useCart, useCurrency, usePayments } from '@payloadcms/plugin-ecommerce/client/react'
+import { CheckCircle2, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
@@ -76,6 +78,17 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
     expiresAt: null,
   })
   const [termsAccepted, setTermsAccepted] = useState(false)
+  // Inline auth state
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [authLoading, setAuthLoading] = useState(false)
+  // WhatsApp verification state
+  const [waVerified, setWaVerified] = useState(false)
+  const [waVerifying, setWaVerifying] = useState(false)
+  const [waVerifyError, setWaVerifyError] = useState<string | null>(null)
+  // Vouchers state for post-auth fetch
+  const [dynamicVouchers, setDynamicVouchers] = useState<EligibleVoucher[] | null>(null)
   const buyNowItem = useMemo(() => getBuyNowItemFromSearchParams(searchParams), [searchParams])
   const cartItems = useMemo(() => cart?.items || [], [cart?.items])
   const checkoutItems = useMemo(
@@ -87,9 +100,10 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
     [checkoutItems, currency.code],
   )
 
+  const baseVouchers = dynamicVouchers ?? initialEligibleVouchers
   const eligibleVouchers = useMemo(
     () =>
-      initialEligibleVouchers.filter((voucher) => {
+      baseVouchers.filter((voucher) => {
         if (checkoutSubtotal < voucher.minimumSpend) return false
 
         if (voucher.appliesTo === 'specific' && Array.isArray(voucher.products) && voucher.products.length > 0) {
@@ -105,7 +119,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
 
         return true
       }),
-    [checkoutItems, checkoutSubtotal, initialEligibleVouchers],
+    [checkoutItems, checkoutSubtotal, baseVouchers],
   )
 
   const normalizedProfilePhone = (user?.phone || '').trim()
@@ -253,7 +267,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
   }, [countdown, handleReservationExpired])
 
   const cartIsEmpty = checkoutItems.length === 0
-  const canGoToPayment = Boolean(user?.email && whatsAppNumber)
+  const canGoToPayment = Boolean(user?.email && whatsAppNumber && waVerified)
   const activeCurrencyCode = currency.code === 'USD' ? 'USD' : 'IDR'
   const activePaymentMethod = activeCurrencyCode === 'USD' ? 'nowpayments' : 'pakasir'
 
@@ -291,6 +305,101 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
       setIsSavingWhatsApp(false)
     }
   }, [normalizedProfilePhone, normalizedWhatsAppNumber, setUser, user])
+
+  // Inline auth: smart login/register
+  const { create, login } = useAuth()
+
+  const handleInlineAuth = useCallback(async () => {
+    if (!authEmail || !authPassword) {
+      setAuthError('Email dan password wajib diisi.')
+      return
+    }
+
+    setAuthLoading(true)
+    setAuthError(null)
+
+    try {
+      // Try login first
+      await login({ email: authEmail, password: authPassword })
+      toast.success('Berhasil masuk!')
+
+      // Fetch vouchers after login
+      try {
+        const voucherRes = await fetch('/api/vouchers/eligible', {
+          credentials: 'include',
+        })
+        if (voucherRes.ok) {
+          const voucherData = await voucherRes.json()
+          setDynamicVouchers(voucherData.vouchers || [])
+        }
+      } catch {
+        // Voucher fetch failure is non-critical
+      }
+
+      router.refresh()
+    } catch {
+      // Login failed — try creating account
+      try {
+        await create({
+          email: authEmail,
+          password: authPassword,
+          passwordConfirm: authPassword,
+        })
+        toast.success('Akun berhasil dibuat! Selamat datang, member Bronze 🥉')
+        router.refresh()
+      } catch {
+        setAuthError(
+          'Gagal masuk atau mendaftar. Pastikan email valid dan password minimal 6 karakter.',
+        )
+      }
+    } finally {
+      setAuthLoading(false)
+    }
+  }, [authEmail, authPassword, create, login, router])
+
+  // WhatsApp verification
+  const handleVerifyWhatsApp = useCallback(async () => {
+    const cleaned = whatsAppNumber.replace(/\D/g, '')
+    if (cleaned.length < 10) {
+      setWaVerifyError('Nomor WhatsApp tidak valid. Gunakan format 08xxxxxxxxxx.')
+      return
+    }
+
+    setWaVerifying(true)
+    setWaVerifyError(null)
+
+    try {
+      const res = await fetch('/api/whatsapp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ phone: whatsAppNumber }),
+      })
+
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        setWaVerified(true)
+        toast.success('Nomor WhatsApp terverifikasi! ✅')
+        // Also persist to profile
+        void persistWhatsAppToProfile()
+      } else {
+        setWaVerifyError(
+          data.error || 'Nomor WhatsApp tidak valid atau tidak terdaftar di WhatsApp.',
+        )
+      }
+    } catch {
+      setWaVerifyError('Gagal memverifikasi nomor. Coba lagi nanti.')
+    } finally {
+      setWaVerifying(false)
+    }
+  }, [whatsAppNumber, persistWhatsAppToProfile])
+
+  // Reset WA verification when number changes
+  useEffect(() => {
+    setWaVerified(false)
+    setWaVerifyError(null)
+  }, [whatsAppNumber])
 
   const restoreBuyNowCartState = useCallback(async () => {
     if (!buyNowItem) return
@@ -599,49 +708,174 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
 
         {user ? (
           <div className="rounded-3xl bg-accent p-5 dark:bg-card">
-            <div>
-              <p className="font-medium">{user.email}</p>
-              <p className="text-sm text-muted-foreground">
-                Not you?{' '}
-                <Link className="underline" href="/logout">
-                  Log out
-                </Link>
-              </p>
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+              <div>
+                <p className="font-medium">{user.email}</p>
+                <p className="text-sm text-muted-foreground">
+                  Bukan kamu?{' '}
+                  <Link className="underline" href="/logout">
+                    Keluar
+                  </Link>
+                </p>
+              </div>
             </div>
           </div>
         ) : (
-          <div className="rounded-3xl border border-amber-500/20 bg-amber-500/5 p-5 text-sm text-primary/70">
-            Checkout memerlukan login customer.
+          <div className="rounded-3xl border border-primary/20 bg-primary/5 p-5 space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold">Masuk atau Daftar</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Masukkan email dan password untuk melanjutkan. Akun baru akan otomatis terdaftar.
+              </p>
+            </div>
+
+            <GoogleSignInButton
+              className="w-full"
+              label="Masuk dengan Google"
+              redirect="/checkout"
+            />
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">atau</span>
+              </div>
+            </div>
+
+            {authError && <Message error={authError} />}
+
+            <div className="space-y-3">
+              <FormItem>
+                <Label htmlFor="auth-email">Email</Label>
+                <Input
+                  id="auth-email"
+                  type="email"
+                  placeholder="email@contoh.com"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && void handleInlineAuth()}
+                  required
+                  autoComplete="email"
+                />
+              </FormItem>
+              <FormItem>
+                <Label htmlFor="auth-password">Password</Label>
+                <Input
+                  id="auth-password"
+                  type="password"
+                  placeholder="Minimal 6 karakter"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && void handleInlineAuth()}
+                  required
+                  autoComplete="current-password"
+                  minLength={6}
+                />
+              </FormItem>
+              <Button
+                className="w-full"
+                disabled={authLoading || !authEmail || !authPassword}
+                onClick={(e) => {
+                  e.preventDefault()
+                  void handleInlineAuth()
+                }}
+              >
+                {authLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Memproses...
+                  </>
+                ) : (
+                  'Masuk / Daftar'
+                )}
+              </Button>
+            </div>
           </div>
         )}
 
         <div className="rounded-3xl border bg-primary/5 p-5">
           <h2 className="mb-4 text-3xl font-medium">WhatsApp</h2>
-          <FormItem>
-            <Label htmlFor="whatsapp">Nomor WhatsApp</Label>
-            <Input
-              id="whatsapp"
-              name="whatsapp"
-              onBlur={() => {
-                void persistWhatsAppToProfile()
-              }}
-              onChange={(e) => setWhatsAppNumber(e.target.value)}
-              placeholder="08xxxxxxxxxx"
-              required
-              type="tel"
-              value={whatsAppNumber}
-            />
-          </FormItem>
-          <p className="mt-3 text-sm text-primary/60">
-            Nomor ini dipakai untuk konfirmasi order dan tindak lanjut checkout.
-          </p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Nomor ini akan tersimpan ke profil Anda dan tetap bisa diedit kapan saja.
-          </p>
-          {isSavingWhatsApp && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Menyimpan nomor WhatsApp ke profil...
+          {!user ? (
+            <p className="text-sm text-muted-foreground">
+              Masuk terlebih dahulu untuk mengisi nomor WhatsApp.
             </p>
+          ) : (
+            <>
+              <FormItem>
+                <Label htmlFor="whatsapp">Nomor WhatsApp</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="whatsapp"
+                    name="whatsapp"
+                    onChange={(e) => setWhatsAppNumber(e.target.value)}
+                    placeholder="08xxxxxxxxxx"
+                    required
+                    type="tel"
+                    value={whatsAppNumber}
+                    disabled={waVerified}
+                    className={waVerified ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20' : ''}
+                  />
+                  {waVerified ? (
+                    <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/20 px-3 text-sm font-medium text-emerald-600 shrink-0">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Terverifikasi
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={waVerifying || !whatsAppNumber || whatsAppNumber.replace(/\D/g, '').length < 10}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        void handleVerifyWhatsApp()
+                      }}
+                      className="shrink-0"
+                    >
+                      {waVerifying ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Verifikasi...
+                        </>
+                      ) : (
+                        'Verifikasi'
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </FormItem>
+              {waVerifyError && (
+                <p className="mt-2 text-sm text-destructive">{waVerifyError}</p>
+              )}
+              {waVerified ? (
+                <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">
+                  ✅ Nomor WhatsApp terverifikasi. Pesan konfirmasi sudah dikirim ke nomor kamu.
+                </p>
+              ) : (
+                <p className="mt-3 text-sm text-primary/60">
+                  Kami akan mengirim pesan ke WhatsApp kamu untuk memverifikasi nomor ini.
+                </p>
+              )}
+              {waVerified && (
+                <button
+                  type="button"
+                  className="mt-2 text-xs text-muted-foreground underline hover:text-primary"
+                  onClick={() => {
+                    setWaVerified(false)
+                    setWaVerifyError(null)
+                  }}
+                >
+                  Ganti nomor WhatsApp
+                </button>
+              )}
+              {isSavingWhatsApp && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Menyimpan nomor WhatsApp ke profil...
+                </p>
+              )}
+            </>
           )}
         </div>
 
