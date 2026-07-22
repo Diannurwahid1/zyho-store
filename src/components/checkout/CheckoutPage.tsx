@@ -307,7 +307,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
   }, [normalizedProfilePhone, normalizedWhatsAppNumber, setUser, user])
 
   // Inline auth: smart login/register
-  const { create, login } = useAuth()
+  const { login } = useAuth()
 
   const handleInlineAuth = useCallback(async () => {
     if (!authEmail || !authPassword) {
@@ -338,24 +338,42 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
 
       router.refresh()
     } catch {
-      // Login failed — try creating account
+      // Login failed — try creating account via Payload REST API
       try {
-        await create({
-          email: authEmail,
-          password: authPassword,
-          passwordConfirm: authPassword,
+        const createRes = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: authEmail,
+            password: authPassword,
+            passwordConfirm: authPassword,
+          }),
         })
+
+        if (!createRes.ok) {
+          const errData = await createRes.json().catch(() => ({}))
+          const errMsg =
+            errData?.errors?.[0]?.message ||
+            errData?.message ||
+            'Gagal mendaftar. Pastikan email valid dan password minimal 6 karakter.'
+          throw new Error(errMsg)
+        }
+
+        // Account created, now login
+        await login({ email: authEmail, password: authPassword })
         toast.success('Akun berhasil dibuat! Selamat datang, member Bronze 🥉')
         router.refresh()
-      } catch {
+      } catch (regErr) {
         setAuthError(
-          'Gagal masuk atau mendaftar. Pastikan email valid dan password minimal 6 karakter.',
+          regErr instanceof Error
+            ? regErr.message
+            : 'Gagal masuk atau mendaftar. Pastikan email valid dan password minimal 6 karakter.',
         )
       }
     } finally {
       setAuthLoading(false)
     }
-  }, [authEmail, authPassword, create, login, router])
+  }, [authEmail, authPassword, login, router])
 
   // WhatsApp verification
   const handleVerifyWhatsApp = useCallback(async () => {
