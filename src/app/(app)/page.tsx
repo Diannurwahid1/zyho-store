@@ -151,7 +151,6 @@ export default async function Page() {
       <div className="relative z-10">
         <PromoBanner banners={bannerData} />
         <PromoSection language={language} />
-        <RenderHero {...hero} language={language} productCount={productCount} />
         <ProductShowcase language={language} products={showcaseProducts} />
         <PromoBanner banners={bannerData} />
         <Testimonials language={language} testimonials={testimonialData} />
