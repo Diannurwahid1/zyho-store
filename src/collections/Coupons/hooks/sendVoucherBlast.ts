@@ -1,4 +1,5 @@
 import { triggerVoucherBlast } from '@/lib/commerceWhatsApp'
+import { emailVoucherBlast } from '@/lib/commerceEmail'
 import type { CollectionAfterChangeHook } from 'payload'
 
 export const sendVoucherBlastAfterChange: CollectionAfterChangeHook = async ({
@@ -27,6 +28,7 @@ export const sendVoucherBlastAfterChange: CollectionAfterChangeHook = async ({
     return doc
   }
 
+  // WhatsApp blast
   void triggerVoucherBlast({ coupon: doc as any, payload: req.payload })
     .then(async (result) => {
       await req.payload.update({
@@ -50,6 +52,24 @@ export const sendVoucherBlastAfterChange: CollectionAfterChangeHook = async ({
           error: error instanceof Error ? error.message : String(error),
         },
         '[WhatsApp] Voucher blast failed',
+      )
+    })
+
+  // Email blast (parallel)
+  void emailVoucherBlast({ coupon: doc as any, payload: req.payload })
+    .then((result) => {
+      req.payload.logger.info(
+        { couponID: doc.id, emailSent: result.sent, emailFailed: result.failed },
+        '[Email] Voucher blast completed',
+      )
+    })
+    .catch((error) => {
+      req.payload.logger.error(
+        {
+          couponID: doc.id,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        '[Email] Voucher blast failed',
       )
     })
 

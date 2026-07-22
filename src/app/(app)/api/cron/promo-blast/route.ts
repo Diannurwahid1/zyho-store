@@ -1,4 +1,5 @@
 import { collectCustomerRecipients, sendWhatsAppText } from '@/lib/whatsapp'
+import { emailPromoBlast } from '@/lib/commerceEmail'
 import configPromise from '@payload-config'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
@@ -107,7 +108,19 @@ export async function GET(req: NextRequest) {
       await new Promise((resolve) => setTimeout(resolve, 1500))
     }
 
-    payload.logger.info({ failed, sent, total: recipients.length }, '[PromoBlast] Blast selesai')
+    payload.logger.info({ failed, sent, total: recipients.length }, '[PromoBlast] WA blast selesai')
+
+    // Email blast (parallel, non-blocking)
+    void emailPromoBlast({ products, payload })
+      .then((emailResult) => {
+        payload.logger.info(
+          { emailSent: emailResult.sent, emailFailed: emailResult.failed, emailTotal: emailResult.total },
+          '[PromoBlast] Email blast selesai',
+        )
+      })
+      .catch((err) => {
+        payload.logger.error({ err }, '[PromoBlast] Email blast error')
+      })
 
     return NextResponse.json({
       success: true,

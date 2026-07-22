@@ -1,4 +1,5 @@
 import { sendWaitlistBlast } from '@/lib/whatsapp'
+import { emailWaitlistBlast } from '@/lib/commerceEmail'
 import config from '@payload-config'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
@@ -41,11 +42,23 @@ export async function POST(
       )
     }
 
-    // Send the blast
+    // Send the WA blast
     const result = await sendWaitlistBlast({
       waitlistId,
       payload,
     })
+
+    // Send email blast (parallel, non-blocking)
+    void emailWaitlistBlast({ waitlistId, payload })
+      .then((emailResult) => {
+        payload.logger.info(
+          { waitlistId, emailSent: emailResult.sent, emailFailed: emailResult.failed },
+          '[Waitlist] Email blast completed',
+        )
+      })
+      .catch((err) => {
+        payload.logger.error({ err, waitlistId }, '[Waitlist] Email blast error')
+      })
 
     // Log the blast activity
     payload.logger.info(

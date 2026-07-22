@@ -1,4 +1,5 @@
 import { getWhatsAppFailureMeta, notifyPaidOrder } from '@/lib/commerceWhatsApp'
+import { emailNotifyPaidOrder } from '@/lib/commerceEmail'
 import type { CollectionAfterChangeHook } from 'payload'
 
 export const sendTransactionWhatsAppAfterChange: CollectionAfterChangeHook = async ({
@@ -10,6 +11,7 @@ export const sendTransactionWhatsAppAfterChange: CollectionAfterChangeHook = asy
     return doc
   }
 
+  // WhatsApp notification
   void notifyPaidOrder({
     amount: doc.amount || 0,
     currency: doc.currency,
@@ -42,6 +44,33 @@ export const sendTransactionWhatsAppAfterChange: CollectionAfterChangeHook = asy
           transactionID: doc.id,
         },
         '[WhatsApp] Transaction success notification failed',
+      )
+    })
+
+  // Email notification (parallel)
+  void emailNotifyPaidOrder({
+    amount: doc.amount || 0,
+    currency: doc.currency,
+    customer: doc.customer,
+    customerEmail: doc.customerEmail,
+    order: doc.order as any,
+    payload: req.payload,
+  })
+    .then((result) => {
+      if (!result?.success) {
+        req.payload.logger.error(
+          { error: 'reason' in result ? result.reason : 'unknown', transactionID: doc.id },
+          '[Email] Transaction success notification failed',
+        )
+      }
+    })
+    .catch((error) => {
+      req.payload.logger.error(
+        {
+          error: error instanceof Error ? error.message : String(error),
+          transactionID: doc.id,
+        },
+        '[Email] Transaction success notification failed',
       )
     })
 
