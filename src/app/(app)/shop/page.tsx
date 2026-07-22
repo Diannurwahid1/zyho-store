@@ -1,5 +1,6 @@
 import { Grid } from '@/components/Grid'
 import { ProductGridItem } from '@/components/ProductGridItem'
+import { sortProducts } from '@/utilities/sortProducts'
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 
@@ -38,8 +39,10 @@ export default async function ShopPage({ searchParams }: Props) {
       shortDescription: true,
       badge: true,
       soldCount: true,
+      promo: true,
     },
-    ...(normalizedSort ? { sort: normalizedSort } : { sort: 'title' }),
+    ...(normalizedSort ? { sort: normalizedSort } : {}),
+    limit: 100,
     ...(normalizedSearchValue || normalizedCategory
       ? {
           where: {
@@ -90,7 +93,7 @@ export default async function ShopPage({ searchParams }: Props) {
         </div>
       ) : (
         <Grid className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-6">
-          {products.docs.map((product) => <ProductGridItem key={product.id} product={product} />)}
+          {(normalizedSort ? products.docs : sortProducts(products.docs)).map((product) => <ProductGridItem key={product.id} product={product} />)}
         </Grid>
       )}
     </div>

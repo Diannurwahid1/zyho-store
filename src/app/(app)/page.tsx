@@ -6,8 +6,8 @@ import { PromoBanner } from '@/components/PromoBanner'
 import { PromoSection } from '@/components/PromoSection'
 import { Testimonials } from '@/components/Testimonials'
 import { homeStaticData } from '@/endpoints/seed/home-static'
-import { RenderHero } from '@/heros/RenderHero'
 import { generateMeta } from '@/utilities/generateMeta'
+import { sortProducts } from '@/utilities/sortProducts'
 import { getClientLanguage } from '@/utilities/getClientLanguage'
 import configPromise from '@payload-config'
 import { draftMode } from 'next/headers'
@@ -63,16 +63,16 @@ export default async function Page() {
   })
 
   // 3. Get featured products for showcase
-  const { docs: products } = await payload.find({
+  const { docs: rawProducts } = await payload.find({
     collection: 'products',
     where: {
       _status: {
         equals: 'published',
       },
     },
-    sort: '-createdAt',
-    limit: 6,
+    limit: 100,
   })
+  const products = sortProducts(rawProducts).slice(0, 6)
 
   // 4. Get testimonials
   const { docs: testimonials } = await payload.find({
