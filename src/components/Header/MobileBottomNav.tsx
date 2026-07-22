@@ -4,11 +4,10 @@ import { Cart } from '@/components/Cart'
 import { useAuth } from '@/providers/Auth'
 import { cn } from '@/utilities/cn'
 import { useCart } from '@payloadcms/plugin-ecommerce/client/react'
-import { ClipboardList, Home, ShoppingBag, Sparkles, User } from 'lucide-react'
+import { ClipboardList, Home, ShoppingBag, User } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useMemo } from 'react'
-import { toast } from 'sonner'
 
 const dockItems = [
   { href: '/', icon: Home, label: 'Home' },
@@ -99,20 +98,6 @@ export function MobileBottomNav() {
             </Link>
           </div>
           </nav>
-
-          <button
-            className="flex w-full items-center justify-between px-5 py-4 text-left text-white"
-            onClick={() => toast('Tanya AI akan segera hadir.')}
-            type="button"
-          >
-            <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
-              <Sparkles className="h-4 w-4 shrink-0 text-neutral-200" />
-              <span className="truncate">Tanya AI segera hadir</span>
-            </span>
-            <span className="rounded-full border border-white/15 bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-neutral-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]">
-              Coming Soon
-            </span>
-          </button>
           </div>
         </div>
       </div>
