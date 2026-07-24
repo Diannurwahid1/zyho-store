@@ -105,12 +105,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Keranjang checkout tidak valid.' }, { status: 400 })
   }
 
-  const cart = await payload.findByID({
-    collection: 'carts',
-    depth: 0,
-    id: body.cartId,
-    overrideAccess: true,
-  })
+  let cart
+  try {
+    cart = await payload.findByID({
+      collection: 'carts',
+      depth: 0,
+      id: body.cartId,
+      overrideAccess: true,
+    })
+  } catch {
+    return NextResponse.json(
+      { error: 'Keranjang tidak ditemukan. Muat ulang halaman lalu coba checkout lagi.' },
+      { status: 409 },
+    )
+  }
 
   const ownedCart = await ensureCartBelongsToUser({
     cart,
@@ -119,7 +127,7 @@ export async function POST(req: NextRequest) {
     userID: user.id,
   })
 
-  if (!ownedCart) {
+  if (!ownedCart || !Array.isArray((ownedCart as any).items) || (ownedCart as any).items.length === 0) {
     return NextResponse.json({ error: 'Keranjang bukan milik customer ini.' }, { status: 403 })
   }
 

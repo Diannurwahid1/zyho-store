@@ -136,6 +136,9 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
 
   const normalizedProfilePhone = (user?.phone || '').trim()
   const normalizedWhatsAppNumber = whatsAppNumber.trim()
+  const cleanedWhatsAppNumber = normalizedWhatsAppNumber.replace(/\D/g, '')
+  const hasValidWhatsAppNumber =
+    cleanedWhatsAppNumber.length >= 10 && cleanedWhatsAppNumber.length <= 15
 
   useEffect(() => {
     if (!whatsAppNumber && normalizedProfilePhone) {
@@ -220,13 +223,10 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
     if (!response.ok && response.status !== 409) throw new Error('Gagal membatalkan pembayaran.')
   }, [])
 
-  const handleReservationExpired = useCallback(() => {
+  const resetCheckoutState = useCallback(() => {
     setCountdown(null)
-    if (checkoutSession.sessionId) void releaseReservation(checkoutSession.sessionId)
     setReservationId(null)
     setPaymentData(null)
-
-    // Clear checkout session
     setCheckoutSession({
       cartId: null,
       isLocked: false,
@@ -234,35 +234,27 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
       expiresAt: null,
     })
 
-    // Clear session from localStorage
     if (typeof window !== 'undefined') {
       localStorage.removeItem('checkout_session')
     }
+  }, [])
 
+  const clearInvalidCart = useCallback(async () => {
+    resetCheckoutState()
+    await clearCart()
+  }, [clearCart, resetCheckoutState])
+
+  const handleReservationExpired = useCallback(() => {
+    if (checkoutSession.sessionId) void releaseReservation(checkoutSession.sessionId)
+    resetCheckoutState()
     toast.error('Waktu pembayaran habis. Stok sudah dilepas, silakan checkout kembali.')
-  }, [checkoutSession.sessionId, releaseReservation])
+  }, [checkoutSession.sessionId, releaseReservation, resetCheckoutState])
 
   const handleCancelPayment = useCallback(async () => {
-    setCountdown(null)
     if (checkoutSession.sessionId) await releaseReservation(checkoutSession.sessionId)
-    setReservationId(null)
-    setPaymentData(null)
-
-    // Clear checkout session
-    setCheckoutSession({
-      cartId: null,
-      isLocked: false,
-      sessionId: null,
-      expiresAt: null,
-    })
-
-    // Clear session from localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('checkout_session')
-    }
-
+    resetCheckoutState()
     toast.success('Pembayaran dibatalkan. Stok sudah kembali tersedia.')
-  }, [checkoutSession.sessionId, releaseReservation])
+  }, [checkoutSession.sessionId, releaseReservation, resetCheckoutState])
 
   useEffect(() => {
     if (!checkoutSession.expiresAt) return
@@ -283,7 +275,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
   }, [countdown, handleReservationExpired])
 
   const cartIsEmpty = checkoutItems.length === 0
-  const canGoToPayment = Boolean(user?.email && whatsAppNumber && waVerified)
+  const canGoToPayment = Boolean(user?.email && hasValidWhatsAppNumber)
   const activeCurrencyCode = currency.code === 'USD' ? 'USD' : 'IDR'
   const activePaymentMethod = activeCurrencyCode === 'USD' ? 'nowpayments' : 'pakasir'
 
@@ -513,6 +505,16 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
       })
       const sessionResult = await readJSONResponse<{ error?: string; session?: any }>(sessionResponse)
       if (!sessionResponse.ok) {
+        const sessionError = sessionResult?.error || 'Tidak dapat membuat sesi checkout.'
+
+        if (
+          sessionError === 'Keranjang checkout tidak valid.' ||
+          sessionError === 'Keranjang tidak ditemukan. Muat ulang halaman lalu coba checkout lagi.'
+        ) {
+          await clearInvalidCart()
+          throw new Error('Keranjang sudah tidak valid dan telah dikosongkan. Silakan pilih produk lagi.')
+        }
+
         if (sessionResult?.session) {
           const existing = sessionResult.session
           setCheckoutSession({
@@ -525,7 +527,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
           setPaymentData(existing.paymentData)
           setCountdown(Math.max(0, Math.ceil((existing.expiresAt - Date.now()) / 1000)))
         }
-        throw new Error(sessionResult?.error || 'Tidak dapat membuat sesi checkout.')
+        throw new Error(sessionError)
       }
 
       const activeSession = sessionResult?.session
@@ -653,6 +655,8 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
     reservationCartSecret,
     reservationItems,
     releaseReservation,
+    clearInvalidCart,
+    resetCheckoutState,
     selectedVoucherCode,
   ])
 
@@ -871,7 +875,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={waVerifying || !whatsAppNumber || whatsAppNumber.replace(/\D/g, '').length < 10}
+                      disabled={waVerifying || !hasValidWhatsAppNumber}
                       onClick={(e) => {
                         e.preventDefault()
                         void handleVerifyWhatsApp()
@@ -884,7 +888,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
                           Verifikasi...
                         </>
                       ) : (
-                        'Verifikasi'
+                        'Cek WA'
                       )}
                     </Button>
                   )}
@@ -899,7 +903,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
                 </p>
               ) : (
                 <p className="mt-3 text-sm text-primary/60">
-                  Kami akan mengirim pesan ke WhatsApp kamu untuk memverifikasi nomor ini.
+                  Nomor ini akan dipakai untuk konfirmasi order dan pengiriman produk digital. Verifikasi WhatsApp bersifat opsional.
                 </p>
               )}
               {waVerified && (
