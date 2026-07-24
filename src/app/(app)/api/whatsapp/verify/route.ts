@@ -1,8 +1,8 @@
 import {
-  formatWhatsAppNumber,
-  getWhatsAppSessionStatus,
-  isWhatsAppConfigured,
-  sendWhatsAppText,
+    formatWhatsAppNumber,
+    getWhatsAppSessionStatus,
+    isWhatsAppConfigured,
+    sendWhatsAppText,
 } from '@/lib/whatsapp'
 import configPromise from '@payload-config'
 import { headers as getHeaders } from 'next/headers'

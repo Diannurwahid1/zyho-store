@@ -1,5 +1,5 @@
-import { getWhatsAppFailureMeta, notifyPaidOrder, notifyPendingPayment } from '@/lib/commerceWhatsApp'
 import { emailNotifyPaidOrder, emailNotifyPendingPayment } from '@/lib/commerceEmail'
+import { getWhatsAppFailureMeta, notifyPaidOrder, notifyPendingPayment } from '@/lib/commerceWhatsApp'
 import type { CollectionAfterChangeHook } from 'payload'
 
 const PENDING_STATUSES = new Set(['created', 'waiting_payment'])

@@ -1,5 +1,5 @@
-import { collectCustomerRecipients, sendWhatsAppText } from '@/lib/whatsapp'
 import { emailPromoBlast } from '@/lib/commerceEmail'
+import { collectCustomerRecipients, sendWhatsAppText } from '@/lib/whatsapp'
 import configPromise from '@payload-config'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'

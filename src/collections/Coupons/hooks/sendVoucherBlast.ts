@@ -1,5 +1,5 @@
-import { triggerVoucherBlast } from '@/lib/commerceWhatsApp'
 import { emailVoucherBlast } from '@/lib/commerceEmail'
+import { triggerVoucherBlast } from '@/lib/commerceWhatsApp'
 import type { CollectionAfterChangeHook } from 'payload'
 
 export const sendVoucherBlastAfterChange: CollectionAfterChangeHook = async ({

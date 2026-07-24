@@ -1,5 +1,5 @@
-import { sendWaitlistBlast } from '@/lib/whatsapp'
 import { emailWaitlistBlast } from '@/lib/commerceEmail'
+import { sendWaitlistBlast } from '@/lib/whatsapp'
 import config from '@payload-config'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'

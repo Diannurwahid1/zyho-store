@@ -1,5 +1,5 @@
-import { getWhatsAppFailureMeta, notifyPaidOrder } from '@/lib/commerceWhatsApp'
 import { emailNotifyPaidOrder } from '@/lib/commerceEmail'
+import { getWhatsAppFailureMeta, notifyPaidOrder } from '@/lib/commerceWhatsApp'
 import type { CollectionAfterChangeHook } from 'payload'
 
 export const sendTransactionWhatsAppAfterChange: CollectionAfterChangeHook = async ({
