@@ -11,6 +11,11 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   
+  // Allow access to maintenance page itself
+  if (pathname === '/maintenance' || pathname.startsWith('/maintenance/')) {
+    return NextResponse.next()
+  }
+  
   // Allow access to admin panel (mlebu)
   if (pathname.startsWith('/mlebu') || pathname.startsWith('/admin')) {
     return NextResponse.next()
@@ -34,5 +39,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|media/maintenance.png).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|media/maintenance.png|maintenance).*)'],
 }
