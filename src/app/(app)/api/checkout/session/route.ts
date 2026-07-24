@@ -15,6 +15,7 @@ const getContext = async (req: NextRequest) => {
 }
 
 const publicSession = (session: any) => ({
+  cartId: session.cartId || null,
   currency: session.currency,
   expiresAt: new Date(session.expiresAt).getTime(),
   paymentData: session.paymentData || null,

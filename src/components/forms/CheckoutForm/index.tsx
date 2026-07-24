@@ -11,6 +11,16 @@ import { useRouter } from 'next/navigation'
 import QRCode from 'qrcode'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
+const readJSONResponse = async <T,>(response: Response): Promise<T | null> => {
+  const text = await response.text()
+
+  if (!text) {
+    return null
+  }
+
+  return JSON.parse(text) as T
+}
+
 type Props = {
   customerEmail?: string
   customerName?: string
@@ -113,7 +123,7 @@ const PakasirCheckoutForm: React.FC<
             ? `/api/nowpayments?paymentId=${encodeURIComponent(String(nowpaymentsPaymentID || ''))}`
             : `/api/pakasir?order_id=${orderID}&amount=${amount}`,
         )
-        const data = await res.json()
+        const data = await readJSONResponse<any>(res)
         const txStatus = isNowPayments
           ? String(data?.status || data?.payment_status || '').toLowerCase()
           : data?.transaction?.status
@@ -150,9 +160,13 @@ const PakasirCheckoutForm: React.FC<
               throw new Error(`HTTP ${confirmResponse.status}`)
             }
 
-            const result = await confirmResponse.json()
+            const result = await readJSONResponse<any>(confirmResponse)
             console.log('[CheckoutForm] confirmOrder result:', result)
-            console.log('[CheckoutForm] result has orderID?', 'orderID' in result, result.orderID)
+            console.log(
+              '[CheckoutForm] result has orderID?',
+              !!result && typeof result === 'object' && 'orderID' in result,
+              result && typeof result === 'object' ? (result as any).orderID : undefined,
+            )
 
             if (result && typeof result === 'object' && 'orderID' in result && result.orderID) {
               console.log('[CheckoutForm] Setting success popup...')
@@ -238,7 +252,7 @@ const PakasirCheckoutForm: React.FC<
         }),
       })
 
-      const data = await res.json()
+      const data = await readJSONResponse<any>(res)
 
       if (!res.ok || !data?.payment?.payment_number) {
         setError(data?.message || data?.error || 'Gagal membuat transaksi QRIS.')
@@ -286,7 +300,7 @@ const PakasirCheckoutForm: React.FC<
       })
 
       if (!res.ok) {
-        const data = await res.json()
+        const data = await readJSONResponse<any>(res)
         setError(data?.message || data?.error || 'Simulasi gagal.')
       }
     } catch {

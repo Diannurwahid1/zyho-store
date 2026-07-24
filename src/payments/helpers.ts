@@ -135,11 +135,11 @@ export const preparePaymentContext = async ({
 
   const rawData = getExtendedPaymentData(data, req)
   const checkoutSessionID = String(rawData?.checkoutSessionId || '')
-  await assertOwnedActiveCheckoutSession(req, checkoutSessionID)
+  const activeCheckoutSession = await assertOwnedActiveCheckoutSession(req, checkoutSessionID)
   const paymentReference: string = rawData?.paymentIntentID ?? rawData?.paymentReference ?? ''
   const customerEmail: string = rawData?.customerEmail ?? req.user?.email ?? ''
   const customerID = await resolveCustomerID({ customerEmail, req })
-  const cartID = rawData?.cartID
+  const cartID = activeCheckoutSession?.cartId || rawData?.cartID
   const buyNowItem = getBuyNowItemFromRawData(rawData)
   const voucherCode = normalizeCouponCode(rawData?.voucherCode)
   const billingAddress = rawData?.billingAddress

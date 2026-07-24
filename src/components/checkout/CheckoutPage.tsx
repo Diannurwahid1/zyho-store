@@ -45,9 +45,20 @@ type PaymentData = {
 }
 
 type CheckoutSessionState = {
+  cartId: string | null
   isLocked: boolean
   sessionId: string | null
   expiresAt: number | null
+}
+
+const readJSONResponse = async <T,>(response: Response): Promise<T | null> => {
+  const text = await response.text()
+
+  if (!text) {
+    return null
+  }
+
+  return JSON.parse(text) as T
 }
 
 function formatCountdown(seconds: number): string {
@@ -73,6 +84,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
   const [selectedVoucherCode, setSelectedVoucherCode] = useState<string>('')
   const [pakasirFee, setPakasirFee] = useState<number | null>(null)
   const [checkoutSession, setCheckoutSession] = useState<CheckoutSessionState>({
+    cartId: null,
     isLocked: false,
     sessionId: null,
     expiresAt: null,
@@ -144,13 +156,15 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
   useEffect(() => {
     let active = true
     void fetch('/api/checkout/session', { cache: 'no-store', credentials: 'include' })
-      .then((response) => response.json())
-      .then(({ session }) => {
+      .then((response) => readJSONResponse<{ session?: any }>(response))
+      .then((result) => {
+        const session = result?.session
         if (!active || !session) {
           localStorage.removeItem('checkout_session')
           return
         }
         setCheckoutSession({
+          cartId: session.cartId ? String(session.cartId) : null,
           isLocked: true,
           sessionId: session.sessionId,
           expiresAt: session.expiresAt,
@@ -214,6 +228,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
 
     // Clear checkout session
     setCheckoutSession({
+      cartId: null,
       isLocked: false,
       sessionId: null,
       expiresAt: null,
@@ -235,6 +250,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
 
     // Clear checkout session
     setCheckoutSession({
+      cartId: null,
       isLocked: false,
       sessionId: null,
       expiresAt: null,
@@ -459,6 +475,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
       }
       // Clear checkout session after order confirmed
       setCheckoutSession({
+        cartId: null,
         isLocked: false,
         sessionId: null,
         expiresAt: null,
@@ -494,11 +511,12 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
       })
-      const sessionResult = await sessionResponse.json()
+      const sessionResult = await readJSONResponse<{ error?: string; session?: any }>(sessionResponse)
       if (!sessionResponse.ok) {
         if (sessionResult?.session) {
           const existing = sessionResult.session
           setCheckoutSession({
+            cartId: existing.cartId ? String(existing.cartId) : null,
             isLocked: true,
             sessionId: existing.sessionId,
             expiresAt: existing.expiresAt,
@@ -510,9 +528,13 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
         throw new Error(sessionResult?.error || 'Tidak dapat membuat sesi checkout.')
       }
 
-      const activeSession = sessionResult.session
+      const activeSession = sessionResult?.session
+      if (!activeSession) {
+        throw new Error('Sesi checkout tidak valid.')
+      }
       claimedSessionID = activeSession.sessionId
       setCheckoutSession({
+        cartId: activeSession.cartId ? String(activeSession.cartId) : null,
         expiresAt: activeSession.expiresAt,
         isLocked: true,
         sessionId: activeSession.sessionId,
@@ -520,12 +542,14 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
       setReservationId(activeSession.sessionId)
       setCountdown(Math.max(0, Math.ceil((activeSession.expiresAt - Date.now()) / 1000)))
 
-      if (reservationBaseId && reservationItems.length > 0) {
+      const sessionCartId = activeSession.cartId ? String(activeSession.cartId) : reservationBaseId
+
+      if (sessionCartId && reservationItems.length > 0) {
         const reserveRes = await fetch('/api/stock/reserve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            cartId: reservationBaseId,
+            cartId: sessionCartId,
             cartSecret: reservationCartSecret,
             items: reservationItems,
             reservationId: activeSession.sessionId,
@@ -533,7 +557,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
         })
 
         if (!reserveRes.ok) {
-          const resData = await reserveRes.json().catch(() => ({}))
+          const resData = (await readJSONResponse<{ error?: string }>(reserveRes)) || {}
           const msg = resData?.error ?? 'Stok tidak tersedia untuk beberapa item.'
           setError(msg)
           toast.error(msg)
@@ -541,7 +565,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
           return
         }
 
-        const resData = await reserveRes.json()
+        const resData = await readJSONResponse<{ reservationId?: string }>(reserveRes)
         const newReservationId = resData?.reservationId as string | undefined
 
         if (newReservationId) {
@@ -571,6 +595,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
         setPaymentData(paymentDataWithMethod)
 
         const checkoutSessionData = {
+          cartId: sessionCartId,
           sessionId: activeSession.sessionId,
           reservationId: activeSession.sessionId,
           expiresAt: activeSession.expiresAt,
@@ -596,6 +621,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
         }
 
         setCheckoutSession({
+          cartId: sessionCartId,
           isLocked: true,
           sessionId: activeSession.sessionId,
           expiresAt: activeSession.expiresAt,
@@ -1067,7 +1093,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
                 amount={paymentData.amount}
                 billingAddress={checkoutContactAddress}
                 buyNowItem={buyNowItem}
-                cartID={reservationBaseId}
+                cartID={checkoutSession.cartId || reservationBaseId}
                 checkoutSessionId={checkoutSession.sessionId}
                 customerEmail={customerEmail}
                 customerName={user?.name || user?.email || 'Customer'}
