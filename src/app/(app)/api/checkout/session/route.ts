@@ -25,6 +25,18 @@ const publicSession = (session: any) => ({
   status: session.status,
 })
 
+const sanitizeCartItems = (items: any[] | null | undefined) =>
+  Array.isArray(items)
+    ? items.map((item) => ({
+        product: typeof item?.product === 'object' ? item.product?.id : item?.product,
+        variant:
+          typeof item?.variant === 'object'
+            ? item.variant?.id
+            : item?.variant || undefined,
+        quantity: Number(item?.quantity) || 0,
+      }))
+    : []
+
 const ensureCartBelongsToUser = async ({
   cart,
   cartSecret,
@@ -59,7 +71,7 @@ const ensureCartBelongsToUser = async ({
     collection: 'carts',
     data: {
       customer: userID,
-      items: cart.items || [],
+      items: sanitizeCartItems(cart.items),
       currency: cart.currency,
     } as any,
     overrideAccess: true,

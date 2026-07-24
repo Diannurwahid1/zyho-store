@@ -15,6 +15,18 @@ const ensureCartBelongsToUser = async ({
   payload: Awaited<ReturnType<typeof getPayload>>
   userID: number | string
 }) => {
+  const sanitizeCartItems = (items: any[] | null | undefined) =>
+    Array.isArray(items)
+      ? items.map((item) => ({
+          product: typeof item?.product === 'object' ? item.product?.id : item?.product,
+          variant:
+            typeof item?.variant === 'object'
+              ? item.variant?.id
+              : item?.variant || undefined,
+          quantity: Number(item?.quantity) || 0,
+        }))
+      : []
+
   const cartCustomer = typeof cart.customer === 'object' ? cart.customer?.id : cart.customer
 
   if (cartCustomer && String(cartCustomer) === String(userID)) {
@@ -36,7 +48,7 @@ const ensureCartBelongsToUser = async ({
     collection: 'carts',
     data: {
       customer: userID,
-      items: cart.items || [],
+      items: sanitizeCartItems(cart.items),
       currency: cart.currency,
     } as any,
     overrideAccess: true,
