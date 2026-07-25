@@ -62,8 +62,17 @@ const readJSONResponse = async <T,>(response: Response): Promise<T | null> => {
   return JSON.parse(text) as T
 }
 
-const calculateVoucherPreviewDiscount = (voucher: EligibleVoucher | null, subtotal: number) => {
+const calculateVoucherPreviewDiscount = (
+  voucher: EligibleVoucher | null,
+  subtotal: number,
+  currencyCode: string,
+) => {
   if (!voucher) return 0
+
+  if (voucher.discountType === 'percentage' && voucher.amount >= 100) {
+    const finalUnitPrice = currencyCode === 'IDR' ? 1000 : 0
+    return Math.max(subtotal - finalUnitPrice, 0)
+  }
 
   if (voucher.discountType === 'percentage') {
     return Math.min(Math.round((subtotal * voucher.amount) / 100), subtotal)
@@ -187,8 +196,8 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
     [checkoutItems, checkoutSubtotal, currency.code, selectedVoucher],
   )
   const previewDiscountAmount = useMemo(
-    () => calculateVoucherPreviewDiscount(selectedVoucher, voucherApplicableSubtotal),
-    [selectedVoucher, voucherApplicableSubtotal],
+    () => calculateVoucherPreviewDiscount(selectedVoucher, voucherApplicableSubtotal, currency.code),
+    [currency.code, selectedVoucher, voucherApplicableSubtotal],
   )
   const previewTotalAmount = Math.max(checkoutSubtotal - previewDiscountAmount, 0)
 

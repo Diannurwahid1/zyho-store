@@ -161,6 +161,25 @@ const getVoucherDiscountBaseSubtotal = ({
   return eligibleItemsSubtotal
 }
 
+const calculateScopedVoucherDiscount = ({
+  currencyCode,
+  subtotal,
+  voucher,
+}: {
+  currencyCode: 'IDR' | 'USD'
+  subtotal: number
+  voucher: Awaited<ReturnType<typeof getVoucherByCodeForUser>>
+}) => {
+  if (!voucher) return 0
+
+  if (voucher.discountType === 'percentage' && voucher.amount >= 100) {
+    const finalUnitPrice = currencyCode === 'IDR' ? 1000 : 0
+    return Math.max(subtotal - finalUnitPrice, 0)
+  }
+
+  return calculateVoucherDiscount(voucher, subtotal)
+}
+
 export const preparePaymentContext = async ({
   currencyCode,
   data,
@@ -232,7 +251,11 @@ export const preparePaymentContext = async ({
       subtotal: subtotalBeforeDiscount,
       voucher: eligibleVoucher,
     })
-    discountAmount = calculateVoucherDiscount(eligibleVoucher, discountBaseSubtotal)
+    discountAmount = calculateScopedVoucherDiscount({
+      currencyCode,
+      subtotal: discountBaseSubtotal,
+      voucher: eligibleVoucher,
+    })
     amount = Math.max(subtotalBeforeDiscount - discountAmount, 0)
   }
 
@@ -295,7 +318,11 @@ export const buildInitiatePaymentPayload = async ({
     subtotal,
     voucher: eligibleVoucher,
   })
-  const discountAmount = eligibleVoucher ? calculateVoucherDiscount(eligibleVoucher, discountBaseSubtotal) : 0
+  const discountAmount = calculateScopedVoucherDiscount({
+    currencyCode,
+    subtotal: discountBaseSubtotal,
+    voucher: eligibleVoucher,
+  })
   const orderID = `INV${Date.now()}`
 
   return {
