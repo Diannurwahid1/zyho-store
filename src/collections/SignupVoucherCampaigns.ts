@@ -118,7 +118,7 @@ export const SignupVoucherCampaigns: CollectionConfig = {
           min: 0,
           max: 100,
           admin: {
-            description: 'Probabilitas bucket ini dalam persen. Sisa dari 100% dianggap zonk.',
+            description: 'Bobot peluang relatif. Semua user tetap mendapat salah satu voucher aktif.',
           },
         },
         {
