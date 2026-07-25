@@ -93,7 +93,7 @@ const getVoucherPreviewSubtotal = (
     return total + getCartItemUnitPrice(item, currencyCode) * (item.quantity ?? 0)
   }, 0)
 
-  if (voucher.discountType === 'percentage' && voucher.amount >= 100) {
+  if (voucher.discountType === 'percentage' && voucher.amount > 85) {
     return items.reduce((highestUnitPrice, item) => {
       if (!isEligibleItem(item)) return highestUnitPrice
       if ((item.quantity ?? 0) <= 0) return highestUnitPrice
