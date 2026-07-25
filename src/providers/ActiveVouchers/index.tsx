@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import { useAuth } from '@/providers/Auth'
 
 interface VoucherDiscount {
   couponId: string
@@ -8,11 +9,19 @@ interface VoucherDiscount {
   discountType: 'percentage' | 'fixed'
   amount: number
   appliesTo: 'all' | 'specific'
+  isWelcomeVoucher?: boolean
 }
 
 interface ActiveVouchersData {
   global: VoucherDiscount | null
   perProduct: Record<string, VoucherDiscount>
+}
+
+type WelcomeReward = {
+  amount: number
+  code: string
+  discountType: 'fixed' | 'percentage'
+  productIds: number[]
 }
 
 interface ActiveVouchersContextValue {
@@ -30,7 +39,9 @@ const ActiveVouchersContext = createContext<ActiveVouchersContextValue>({
 export const useActiveVouchers = () => useContext(ActiveVouchersContext)
 
 export const ActiveVouchersProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { status } = useAuth()
   const [vouchers, setVouchers] = useState<ActiveVouchersData | null>(null)
+  const [welcomeReward, setWelcomeReward] = useState<WelcomeReward | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -56,10 +67,56 @@ export const ActiveVouchersProvider: React.FC<{ children: React.ReactNode }> = (
     return () => clearInterval(interval)
   }, [])
 
-  const getProductDiscount = (productId: string | number): VoucherDiscount | null => {
-    if (!vouchers) return null
+  useEffect(() => {
+    if (status !== 'loggedIn') {
+      setWelcomeReward(null)
+      return
+    }
 
+    let active = true
+
+    const fetchWelcomeReward = async () => {
+      try {
+        const response = await fetch('/api/signup-voucher/welcome', {
+          cache: 'no-store',
+          credentials: 'include',
+        })
+        if (!response.ok) return
+
+        const data = await response.json()
+        if (active) {
+          setWelcomeReward(data?.reward || null)
+        }
+      } catch {
+        if (active) setWelcomeReward(null)
+      }
+    }
+
+    void fetchWelcomeReward()
+
+    return () => {
+      active = false
+    }
+  }, [status])
+
+  const getProductDiscount = (productId: string | number): VoucherDiscount | null => {
     const id = String(productId)
+
+    if (
+      welcomeReward &&
+      (welcomeReward.productIds.length === 0 || welcomeReward.productIds.includes(Number(productId)))
+    ) {
+      return {
+        amount: welcomeReward.amount,
+        appliesTo: welcomeReward.productIds.length > 0 ? 'specific' : 'all',
+        couponCode: welcomeReward.code,
+        couponId: welcomeReward.code,
+        discountType: welcomeReward.discountType,
+        isWelcomeVoucher: true,
+      }
+    }
+
+    if (!vouchers) return null
 
     // Cek apakah ada voucher spesifik untuk produk ini
     if (vouchers.perProduct[id]) {

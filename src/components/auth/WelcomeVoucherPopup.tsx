@@ -21,6 +21,7 @@ type WelcomeReward = {
   discountType: 'fixed' | 'percentage'
   expiresAt: null | string
   productHref: string
+  productIds: number[]
   title: string
 }
 
@@ -55,7 +56,6 @@ export const WelcomeVoucherPopup = () => {
     const params = new URLSearchParams(window.location.search)
     const fromGoogle = params.get('welcome') === '1'
     const pending = window.sessionStorage.getItem('welcome-voucher-pending') === '1'
-    if (!fromGoogle && !pending) return
 
     if (fromGoogle) {
       params.delete('welcome')
@@ -74,7 +74,9 @@ export const WelcomeVoucherPopup = () => {
           window.sessionStorage.removeItem('welcome-voucher-pending')
           setImageError(false)
           setReward(nextReward)
-          setOpen(true)
+          if (fromGoogle || pending) {
+            setOpen(true)
+          }
           return
         }
 

@@ -66,6 +66,11 @@ export const DiscountedPrice: React.FC<DiscountedPriceProps> = ({
 
   return (
     <div className="flex flex-col gap-1">
+      {showDiscountBadge && discount.isWelcomeVoucher && (
+        <span className="w-fit rounded-full border border-amber-300/40 bg-amber-300/10 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:text-amber-200">
+          Promo pengguna baru
+        </span>
+      )}
       <div className="flex items-center gap-2">
         {/* Harga original dengan garis coret */}
         <LocalizedPrice
@@ -75,8 +80,13 @@ export const DiscountedPrice: React.FC<DiscountedPriceProps> = ({
           priceInUSD={priceInUSD}
         />
         {/* Badge diskon */}
-        {showDiscountBadge && (
+        {showDiscountBadge && !discount.isWelcomeVoucher && (
           <span className="rounded-md bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">
+            -{getDiscountPercentage()}%
+          </span>
+        )}
+        {showDiscountBadge && discount.isWelcomeVoucher && (
+          <span className="rounded-md bg-amber-300 px-2 py-0.5 text-xs font-black text-black">
             -{getDiscountPercentage()}%
           </span>
         )}

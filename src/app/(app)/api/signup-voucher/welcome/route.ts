@@ -1,8 +1,20 @@
 import configPromise from '@payload-config'
 import { awardSignupVoucherForUser } from '@/lib/signupVoucherCampaign'
+import { getUserVoucherUsageCount } from '@/lib/vouchers'
 import { headers as getHeaders } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getPayload, type Payload, type PayloadRequest } from 'payload'
+
+const getVoucherProductIDs = (voucher: any) =>
+  Array.isArray(voucher?.products)
+    ? voucher.products
+        .map((product: any) =>
+          typeof product === 'object' && product ? product.id : product,
+        )
+        .filter((id: any) => typeof id === 'number' || typeof id === 'string')
+        .map((id: string | number) => Number(id))
+        .filter((id: number) => Number.isFinite(id))
+    : []
 
 const getProductHref = async (payload: Payload, voucher: any) => {
   if (voucher?.appliesTo !== 'specific' || !Array.isArray(voucher.products)) return '/shop'
@@ -28,6 +40,25 @@ const getProductHref = async (payload: Payload, voucher: any) => {
   }
 }
 
+const isVoucherUsable = async (payload: Payload, userID: number, voucher: any) => {
+  if (!voucher || voucher.status !== 'active' || !voucher.code) return false
+
+  const now = Date.now()
+  const startsAt = voucher.startsAt ? new Date(voucher.startsAt).getTime() : null
+  const expiresAt = voucher.expiresAt ? new Date(voucher.expiresAt).getTime() : null
+
+  if (startsAt && startsAt > now) return false
+  if (expiresAt && expiresAt < now) return false
+  if (typeof voucher.usageLimit === 'number' && (voucher.usedCount || 0) >= voucher.usageLimit) {
+    return false
+  }
+
+  const usageCount = await getUserVoucherUsageCount(payload, userID, voucher.code)
+  if (typeof voucher.perUserLimit === 'number' && usageCount >= voucher.perUserLimit) return false
+
+  return true
+}
+
 const formatRewardResponse = async (payload: Payload, voucher: any) =>
   NextResponse.json({
     reward: {
@@ -36,6 +67,7 @@ const formatRewardResponse = async (payload: Payload, voucher: any) =>
       discountType: voucher.discountType,
       expiresAt: voucher.expiresAt || null,
       productHref: await getProductHref(payload, voucher),
+      productIds: getVoucherProductIDs(voucher),
       title: voucher.title,
       benefitSummary: voucher.benefitSummary || null,
     },
@@ -92,7 +124,9 @@ export async function GET() {
   const reward = rewards.docs[0] as any
   const voucher = reward?.voucher && typeof reward.voucher === 'object' ? reward.voucher : null
 
-  if (reward && voucher) return formatRewardResponse(payload, voucher)
+  if (reward && voucher && await isVoucherUsable(payload, Number(user.id), voucher)) {
+    return formatRewardResponse(payload, voucher)
+  }
 
   const assignedCoupons = await payload.find({
     collection: 'coupons',
@@ -110,7 +144,9 @@ export async function GET() {
   })
 
   const assignedCoupon = assignedCoupons.docs[0] as any
-  if (assignedCoupon) return formatRewardResponse(payload, assignedCoupon)
+  if (assignedCoupon && await isVoucherUsable(payload, Number(user.id), assignedCoupon)) {
+    return formatRewardResponse(payload, assignedCoupon)
+  }
 
   return NextResponse.json({ reward: null })
 }
