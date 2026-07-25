@@ -61,6 +61,16 @@ const readJSONResponse = async <T,>(response: Response): Promise<T | null> => {
   return JSON.parse(text) as T
 }
 
+const calculateVoucherPreviewDiscount = (voucher: EligibleVoucher | null, subtotal: number) => {
+  if (!voucher) return 0
+
+  if (voucher.discountType === 'percentage') {
+    return Math.min(Math.round((subtotal * voucher.amount) / 100), subtotal)
+  }
+
+  return Math.min(voucher.amount, subtotal)
+}
+
 function formatCountdown(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
@@ -82,6 +92,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
   const [reservationId, setReservationId] = useState<string | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [selectedVoucherCode, setSelectedVoucherCode] = useState<string>('')
+  const [voucherAppliedPulse, setVoucherAppliedPulse] = useState(false)
   const [pakasirFee, setPakasirFee] = useState<number | null>(null)
   const [checkoutSession, setCheckoutSession] = useState<CheckoutSessionState>({
     cartId: null,
@@ -133,6 +144,15 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
       }),
     [checkoutItems, checkoutSubtotal, baseVouchers],
   )
+  const selectedVoucher = useMemo(
+    () => eligibleVouchers.find((voucher) => voucher.code === selectedVoucherCode) || null,
+    [eligibleVouchers, selectedVoucherCode],
+  )
+  const previewDiscountAmount = useMemo(
+    () => calculateVoucherPreviewDiscount(selectedVoucher, checkoutSubtotal),
+    [checkoutSubtotal, selectedVoucher],
+  )
+  const previewTotalAmount = Math.max(checkoutSubtotal - previewDiscountAmount, 0)
 
   const normalizedProfilePhone = (user?.phone || '').trim()
   const normalizedWhatsAppNumber = whatsAppNumber.trim()
@@ -154,6 +174,16 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
       setSelectedVoucherCode('')
     }
   }, [eligibleVouchers, selectedVoucherCode])
+
+  const handleVoucherChange = useCallback((voucherCode: string) => {
+    setSelectedVoucherCode(voucherCode)
+
+    if (voucherCode) {
+      setVoucherAppliedPulse(true)
+      toast.success('Voucher berhasil digunakan. Total checkout sudah dikurangi.')
+      window.setTimeout(() => setVoucherAppliedPulse(false), 1200)
+    }
+  }, [])
 
   // The server owns checkout state; localStorage is only a UI cache.
   useEffect(() => {
@@ -958,7 +988,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
                   checked={selectedVoucherCode === ''}
                   className="h-4 w-4"
                   name="voucher"
-                  onChange={() => setSelectedVoucherCode('')}
+                  onChange={() => handleVoucherChange('')}
                   type="radio"
                 />
                 <div>
@@ -978,7 +1008,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
                     checked={selectedVoucherCode === voucher.code}
                     className="mt-1 h-4 w-4"
                     name="voucher"
-                    onChange={() => setSelectedVoucherCode(voucher.code)}
+                    onChange={() => handleVoucherChange(voucher.code)}
                     type="radio"
                   />
                   <div className="min-w-0">
@@ -1228,13 +1258,44 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
             return null
           })}
           <hr />
-          <div className="flex items-center justify-between gap-2">
-            <span className="uppercase">Total</span>
-            <Price
-              className="text-3xl font-medium"
-              amount={checkoutSubtotal}
-              currencyCode={activeCurrencyCode}
-            />
+          <div
+            className={`rounded-2xl border p-4 transition-all duration-300 ${
+              voucherAppliedPulse
+                ? 'border-emerald-400 bg-emerald-500/10 shadow-[0_0_30px_rgba(16,185,129,0.22)]'
+                : 'border-transparent bg-transparent'
+            }`}
+          >
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                <span>Subtotal</span>
+                <Price amount={checkoutSubtotal} currencyCode={activeCurrencyCode} />
+              </div>
+
+              {selectedVoucher && (
+                <div className="flex items-center justify-between gap-2 text-emerald-500">
+                  <span>Potongan voucher</span>
+                  <span className="font-semibold">
+                    -<Price as="span" amount={previewDiscountAmount} currencyCode={activeCurrencyCode} />
+                  </span>
+                </div>
+              )}
+
+              {selectedVoucher && (
+                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-500">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Voucher berhasil digunakan
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-2 border-t pt-3">
+                <span className="uppercase">Total bayar</span>
+                <Price
+                  className="text-3xl font-medium"
+                  amount={previewTotalAmount}
+                  currencyCode={activeCurrencyCode}
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}
