@@ -134,14 +134,31 @@ const getVoucherDiscountBaseSubtotal = ({
   subtotal: number
   voucher: Awaited<ReturnType<typeof getVoucherByCodeForUser>>
 }) => {
-  if (!voucher || voucher.appliesTo !== 'specific' || !voucher.products?.length) return subtotal
+  if (!voucher) return subtotal
+  const appliesToSpecificProducts = voucher.appliesTo === 'specific' && Boolean(voucher.products?.length)
+  const isEligibleItem = (item: any) => {
+    if (!appliesToSpecificProducts) return true
 
-  return cartItems.reduce((total, item) => {
     const productId = typeof item.product === 'object' ? item.product?.id : item.product
-    if (!productId || !voucher.products?.includes(Number(productId))) return total
+    return Boolean(productId && voucher.products?.includes(Number(productId)))
+  }
+
+  const eligibleItemsSubtotal = cartItems.reduce((total, item) => {
+    if (!isEligibleItem(item)) return total
 
     return total + getCartItemUnitPrice(item, currencyCode) * (item.quantity ?? 0)
   }, 0)
+
+  if (voucher.discountType === 'percentage' && voucher.amount >= 100) {
+    return cartItems.reduce((highestUnitPrice, item) => {
+      if (!isEligibleItem(item)) return highestUnitPrice
+      if ((item.quantity ?? 0) <= 0) return highestUnitPrice
+
+      return Math.max(highestUnitPrice, getCartItemUnitPrice(item, currencyCode))
+    }, 0)
+  }
+
+  return eligibleItemsSubtotal
 }
 
 export const preparePaymentContext = async ({
