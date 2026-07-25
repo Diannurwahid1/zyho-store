@@ -316,6 +316,20 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
 
   // Inline auth: smart login/register
   const { login } = useAuth()
+  const refreshEligibleVouchers = useCallback(async () => {
+    try {
+      const voucherRes = await fetch('/api/vouchers/eligible', {
+        cache: 'no-store',
+        credentials: 'include',
+      })
+      if (voucherRes.ok) {
+        const voucherData = await voucherRes.json()
+        setDynamicVouchers(voucherData.vouchers || [])
+      }
+    } catch {
+      // Voucher fetch failure is non-critical for checkout auth.
+    }
+  }, [])
 
   const handleInlineAuth = useCallback(async () => {
     if (!authEmail || !authPassword) {
@@ -331,18 +345,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
       await login({ email: authEmail, password: authPassword })
       toast.success('Berhasil masuk!')
 
-      // Fetch vouchers after login
-      try {
-        const voucherRes = await fetch('/api/vouchers/eligible', {
-          credentials: 'include',
-        })
-        if (voucherRes.ok) {
-          const voucherData = await voucherRes.json()
-          setDynamicVouchers(voucherData.vouchers || [])
-        }
-      } catch {
-        // Voucher fetch failure is non-critical
-      }
+      await refreshEligibleVouchers()
 
       router.refresh()
     } catch {
@@ -370,6 +373,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
         // Account created, now login
         window.sessionStorage.setItem('welcome-voucher-pending', '1')
         await login({ email: authEmail, password: authPassword })
+        await refreshEligibleVouchers()
         toast.success('Akun berhasil dibuat! Selamat datang, member Bronze 🥉')
         router.refresh()
       } catch (regErr) {
@@ -382,7 +386,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
     } finally {
       setAuthLoading(false)
     }
-  }, [authEmail, authPassword, login, router])
+  }, [authEmail, authPassword, login, refreshEligibleVouchers, router])
 
   // WhatsApp verification
   const handleVerifyWhatsApp = useCallback(async () => {

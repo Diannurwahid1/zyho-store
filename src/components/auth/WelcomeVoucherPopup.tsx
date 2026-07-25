@@ -29,6 +29,18 @@ const formatIDR = (value: number) =>
     style: 'currency',
   }).format(value)
 
+const fetchWelcomeReward = async () => {
+  const response = await fetch('/api/signup-voucher/welcome', {
+    credentials: 'include',
+    cache: 'no-store',
+  })
+
+  if (!response.ok) return null
+
+  const data = await response.json()
+  return (data?.reward || null) as WelcomeReward | null
+}
+
 export const WelcomeVoucherPopup = () => {
   const { status } = useAuth()
   const [open, setOpen] = useState(false)
@@ -42,22 +54,37 @@ export const WelcomeVoucherPopup = () => {
     const pending = window.sessionStorage.getItem('welcome-voucher-pending') === '1'
     if (!fromGoogle && !pending) return
 
-    window.sessionStorage.removeItem('welcome-voucher-pending')
     if (fromGoogle) {
       params.delete('welcome')
       const query = params.toString()
       window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`)
     }
 
-    void fetch('/api/signup-voucher/welcome', { credentials: 'include', cache: 'no-store' })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => {
-        if (data?.reward) {
-          setReward(data.reward)
+    let cancelled = false
+
+    const loadReward = async () => {
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const nextReward = await fetchWelcomeReward().catch(() => null)
+        if (cancelled) return
+
+        if (nextReward) {
+          window.sessionStorage.removeItem('welcome-voucher-pending')
+          setReward(nextReward)
           setOpen(true)
+          return
         }
-      })
-      .catch(() => undefined)
+
+        await new Promise((resolve) => setTimeout(resolve, 400))
+      }
+
+      window.sessionStorage.removeItem('welcome-voucher-pending')
+    }
+
+    void loadReward()
+
+    return () => {
+      cancelled = true
+    }
   }, [status])
 
   const totalValue = reward
