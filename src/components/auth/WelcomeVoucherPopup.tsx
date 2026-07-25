@@ -196,8 +196,15 @@ export const WelcomeVoucherPopup = () => {
           className="fixed bottom-24 right-4 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-amber-300/40 bg-[#120d05]/95 px-4 py-3 text-white shadow-[0_12px_40px_rgba(245,158,11,0.35)] backdrop-blur transition-transform hover:scale-[1.03] md:bottom-6 md:right-6"
           href={reward.productHref}
         >
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-300 text-lg font-black text-black">
-            %
+          <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-amber-300/30 bg-amber-300">
+            <Image
+              alt="Welcome voucher"
+              className="object-cover"
+              fill
+              sizes="44px"
+              src="/media/welcome-voucher.png"
+              unoptimized
+            />
           </span>
           <span className="min-w-0">
             <span className="block text-xs uppercase tracking-[0.16em] text-amber-200">
