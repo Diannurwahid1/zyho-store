@@ -15,6 +15,7 @@ import {
     buildBuyNowCartItems,
     calculateCartItemsSubtotal,
     getBuyNowItemFromSearchParams,
+    getCartItemUnitPrice,
     matchesBuyNowItem,
 } from '@/lib/buyNow'
 import type { EligibleVoucher } from '@/lib/vouchers'
@@ -69,6 +70,22 @@ const calculateVoucherPreviewDiscount = (voucher: EligibleVoucher | null, subtot
   }
 
   return Math.min(voucher.amount, subtotal)
+}
+
+const getVoucherPreviewSubtotal = (
+  voucher: EligibleVoucher | null,
+  items: any[],
+  currencyCode: string,
+  subtotal: number,
+) => {
+  if (!voucher || voucher.appliesTo !== 'specific' || !voucher.products?.length) return subtotal
+
+  return items.reduce((total, item) => {
+    const productId = typeof item.product === 'object' ? item.product?.id : item.product
+    if (!productId || !voucher.products?.includes(Number(productId))) return total
+
+    return total + getCartItemUnitPrice(item, currencyCode) * (item.quantity ?? 0)
+  }, 0)
 }
 
 function formatCountdown(seconds: number): string {
@@ -148,9 +165,13 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
     () => eligibleVouchers.find((voucher) => voucher.code === selectedVoucherCode) || null,
     [eligibleVouchers, selectedVoucherCode],
   )
+  const voucherApplicableSubtotal = useMemo(
+    () => getVoucherPreviewSubtotal(selectedVoucher, checkoutItems, currency.code, checkoutSubtotal),
+    [checkoutItems, checkoutSubtotal, currency.code, selectedVoucher],
+  )
   const previewDiscountAmount = useMemo(
-    () => calculateVoucherPreviewDiscount(selectedVoucher, checkoutSubtotal),
-    [checkoutSubtotal, selectedVoucher],
+    () => calculateVoucherPreviewDiscount(selectedVoucher, voucherApplicableSubtotal),
+    [selectedVoucher, voucherApplicableSubtotal],
   )
   const previewTotalAmount = Math.max(checkoutSubtotal - previewDiscountAmount, 0)
 

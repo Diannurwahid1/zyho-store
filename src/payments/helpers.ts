@@ -2,6 +2,7 @@ import {
     buildBuyNowCartItems,
     calculateCartItemsSubtotal,
     getBuyNowItemFromRawData,
+    getCartItemUnitPrice,
 } from '@/lib/buyNow'
 import { assertOwnedActiveCheckoutSession } from '@/lib/checkoutSessionServer'
 import { assignDigitalStockToOrder } from '@/lib/digitalStock'
@@ -122,6 +123,27 @@ const resolveCustomerID = async ({
   return foundUsers.docs[0]?.id ?? null
 }
 
+const getVoucherDiscountBaseSubtotal = ({
+  cartItems,
+  currencyCode,
+  subtotal,
+  voucher,
+}: {
+  cartItems: any[]
+  currencyCode: 'IDR' | 'USD'
+  subtotal: number
+  voucher: Awaited<ReturnType<typeof getVoucherByCodeForUser>>
+}) => {
+  if (!voucher || voucher.appliesTo !== 'specific' || !voucher.products?.length) return subtotal
+
+  return cartItems.reduce((total, item) => {
+    const productId = typeof item.product === 'object' ? item.product?.id : item.product
+    if (!productId || !voucher.products?.includes(Number(productId))) return total
+
+    return total + getCartItemUnitPrice(item, currencyCode) * (item.quantity ?? 0)
+  }, 0)
+}
+
 export const preparePaymentContext = async ({
   currencyCode,
   data,
@@ -187,7 +209,13 @@ export const preparePaymentContext = async ({
       throw new Error('Voucher tidak valid untuk akun member ini.')
     }
 
-    discountAmount = calculateVoucherDiscount(eligibleVoucher, subtotalBeforeDiscount)
+    const discountBaseSubtotal = getVoucherDiscountBaseSubtotal({
+      cartItems,
+      currencyCode,
+      subtotal: subtotalBeforeDiscount,
+      voucher: eligibleVoucher,
+    })
+    discountAmount = calculateVoucherDiscount(eligibleVoucher, discountBaseSubtotal)
     amount = Math.max(subtotalBeforeDiscount - discountAmount, 0)
   }
 
@@ -244,7 +272,13 @@ export const buildInitiatePaymentPayload = async ({
           : null,
       })
     : null
-  const discountAmount = eligibleVoucher ? calculateVoucherDiscount(eligibleVoucher, subtotal) : 0
+  const discountBaseSubtotal = getVoucherDiscountBaseSubtotal({
+    cartItems: scopedCartItems,
+    currencyCode,
+    subtotal,
+    voucher: eligibleVoucher,
+  })
+  const discountAmount = eligibleVoucher ? calculateVoucherDiscount(eligibleVoucher, discountBaseSubtotal) : 0
   const orderID = `INV${Date.now()}`
 
   return {
