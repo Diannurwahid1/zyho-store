@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useAuth } from '@/providers/Auth'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
@@ -47,6 +48,7 @@ const fetchWelcomeReward = async () => {
 export const WelcomeVoucherPopup = () => {
   const { status } = useAuth()
   const [imageError, setImageError] = useState(false)
+  const [floatingExpanded, setFloatingExpanded] = useState(false)
   const [open, setOpen] = useState(false)
   const [reward, setReward] = useState<WelcomeReward | null>(null)
 
@@ -194,29 +196,78 @@ export const WelcomeVoucherPopup = () => {
       </Dialog>
 
       {reward && !open && (
-        <Link
-          className="fixed bottom-24 right-4 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-2xl border border-amber-300/40 bg-[#120d05]/95 px-4 py-3 text-white shadow-[0_12px_40px_rgba(245,158,11,0.35)] backdrop-blur transition-transform hover:scale-[1.03] md:bottom-6 md:right-6"
-          href={reward.productHref}
-        >
-          <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-amber-300/30 bg-amber-300">
-            <Image
-              alt="Welcome voucher"
-              className="object-cover"
-              fill
-              sizes="44px"
-              src="/media/welcome-voucher.png"
-              unoptimized
-            />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-xs uppercase tracking-[0.16em] text-amber-200">
-              Voucher aktif
+        <div className="fixed bottom-20 right-3 z-40 flex flex-col items-end gap-2 md:bottom-24 md:right-5">
+          <button
+            aria-expanded={floatingExpanded}
+            className="flex items-center gap-2 rounded-full border border-amber-300/40 bg-[#120d05]/95 px-2.5 py-2 text-white shadow-[0_10px_26px_rgba(245,158,11,0.25)] backdrop-blur transition-transform hover:scale-[1.03] md:hidden"
+            onClick={() => setFloatingExpanded((value) => !value)}
+            type="button"
+          >
+            <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full border border-amber-300/30 bg-amber-300">
+              <Image
+                alt="Welcome voucher"
+                className="object-cover"
+                fill
+                sizes="32px"
+                src="/media/welcome-voucher.png"
+                unoptimized
+              />
             </span>
-            <span className="block truncate text-sm font-bold">
-              {totalValue} - klik untuk pakai
+            <span className="text-xs font-bold">{totalValue}</span>
+            {floatingExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          </button>
+
+          {floatingExpanded && (
+            <Link
+              className="flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-2xl border border-amber-300/40 bg-[#120d05]/95 px-3 py-2.5 text-white shadow-[0_12px_34px_rgba(245,158,11,0.3)] backdrop-blur md:hidden"
+              href={reward.productHref}
+              onClick={() => setFloatingExpanded(false)}
+            >
+              <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-amber-300/30 bg-amber-300">
+                <Image
+                  alt="Welcome voucher"
+                  className="object-cover"
+                  fill
+                  sizes="36px"
+                  src="/media/welcome-voucher.png"
+                  unoptimized
+                />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200">
+                  Voucher aktif
+                </span>
+                <span className="block truncate text-xs font-bold">
+                  {totalValue} - klik untuk pakai
+                </span>
+              </span>
+            </Link>
+          )}
+
+          <Link
+            className="hidden items-center gap-2 rounded-2xl border border-amber-300/40 bg-[#120d05]/95 px-3 py-2 text-white shadow-[0_12px_34px_rgba(245,158,11,0.28)] backdrop-blur transition-transform hover:scale-[1.03] md:flex"
+            href={reward.productHref}
+          >
+            <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-amber-300/30 bg-amber-300">
+              <Image
+                alt="Welcome voucher"
+                className="object-cover"
+                fill
+                sizes="36px"
+                src="/media/welcome-voucher.png"
+                unoptimized
+              />
             </span>
-          </span>
-        </Link>
+            <span className="min-w-0">
+              <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200">
+                Voucher aktif
+              </span>
+              <span className="block max-w-44 truncate text-xs font-bold">
+                {totalValue} - klik untuk pakai
+              </span>
+            </span>
+          </Link>
+        </div>
       )}
     </>
   )
