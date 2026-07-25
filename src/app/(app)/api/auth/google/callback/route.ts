@@ -37,8 +37,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { cookie } = await loginOrCreateGoogleCustomer(code)
-    const response = NextResponse.redirect(new URL(state.redirect, getServerSideURL()))
+    const { cookie, isNewUser } = await loginOrCreateGoogleCustomer(code)
+    const redirectURL = new URL(state.redirect, getServerSideURL())
+    if (isNewUser) redirectURL.searchParams.set('welcome', '1')
+    const response = NextResponse.redirect(redirectURL)
 
     if (!cookie.value) {
       throw new Error('Missing session cookie value')

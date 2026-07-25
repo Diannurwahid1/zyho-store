@@ -61,6 +61,7 @@ export const CreateAccountForm: React.FC = () => {
       }, 1000)
 
       try {
+        window.sessionStorage.setItem('welcome-voucher-pending', '1')
         await login(data)
         gaSignUp('email_password')
         clearTimeout(timer)

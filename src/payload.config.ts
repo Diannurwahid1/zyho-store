@@ -28,6 +28,8 @@ import { Media } from '@/collections/Media'
 import { Pages } from '@/collections/Pages'
 import { PaymentTransactions } from '@/collections/PaymentTransactions'
 import { PromoBanners } from '@/collections/PromoBanners'
+import { SignupCampaignRewards } from '@/collections/SignupCampaignRewards'
+import { SignupVoucherCampaigns } from '@/collections/SignupVoucherCampaigns'
 import { StockLedger } from '@/collections/StockLedger'
 import { StockReservations } from '@/collections/StockReservations'
 import { SupportMessages } from '@/collections/SupportMessages'
@@ -91,6 +93,8 @@ export default buildConfig({
     Licenses,
     PaymentTransactions,
     Coupons,
+    SignupVoucherCampaigns,
+    SignupCampaignRewards,
     PromoBanners,
     Testimonials,
     SupportTickets,

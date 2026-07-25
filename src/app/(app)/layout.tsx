@@ -9,6 +9,7 @@ import { Header } from '@/components/Header'
 import { MobileBottomNav } from '@/components/Header/MobileBottomNav'
 import { LivePreviewListener } from '@/components/LivePreviewListener'
 import { PendingPaymentBubble } from '@/components/PendingPaymentBubble'
+import { WelcomeVoucherPopup } from '@/components/auth/WelcomeVoucherPopup'
 import { Providers } from '@/providers'
 import { InitTheme } from '@/providers/Theme/InitTheme'
 import { BRAND_LOGO_URL, BRAND_NAME } from '@/utilities/brand'
@@ -98,6 +99,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           <Footer />
           <MobileBottomNav />
           <PendingPaymentBubble />
+          <WelcomeVoucherPopup />
           <GoogleAnalytics />
           <MicrosoftClarity />
         </Providers>

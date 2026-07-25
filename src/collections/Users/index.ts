@@ -6,6 +6,7 @@ import { adminOnlyFieldAccess } from '@/access/adminOnlyFieldAccess'
 import { adminOrSelf } from '@/access/adminOrSelf'
 import { checkRole } from '@/access/utilities'
 import { getMemberTier } from '@/lib/member'
+import { awardSignupVoucherCampaignAfterChange } from './hooks/awardSignupVoucherCampaign'
 
 import { ensureFirstUserIsAdmin } from './hooks/ensureFirstUserIsAdmin'
 
@@ -34,6 +35,7 @@ export const Users: CollectionConfig = {
     tokenExpiration: 86400, // 1 day in seconds
   },
   hooks: {
+    afterChange: [awardSignupVoucherCampaignAfterChange],
     beforeChange: [
       ({ data, operation }) => {
         if (!data) return data

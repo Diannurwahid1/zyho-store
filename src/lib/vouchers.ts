@@ -3,6 +3,20 @@ import type { Payload } from 'payload'
 
 import type { MemberTier } from '@/lib/member'
 
+const couponBelongsToUser = (coupon: any, userID: number | string) => {
+  const assignedUser = coupon?.assignedUser
+  const assignedUserID =
+    typeof assignedUser === 'number' || typeof assignedUser === 'string'
+      ? assignedUser
+      : assignedUser && typeof assignedUser === 'object' && 'id' in assignedUser
+        ? (assignedUser as any).id
+        : null
+
+  if (!assignedUserID) return true
+
+  return String(assignedUserID) === String(userID)
+}
+
 type EligibleVoucherArgs = {
   cartItems?: any[]
   cartSubtotal?: number
@@ -136,9 +150,11 @@ export const getEligibleVouchers = async ({ cartItems, cartSubtotal, payload, us
 
   for (const coupon of docs) {
     const code = normalizeCouponCode(coupon.code)
+    const scopedCoupon = coupon as any
 
     if (!code) continue
     if (!isCouponWindowActive(coupon, now)) continue
+    if (!couponBelongsToUser(scopedCoupon, user.id)) continue
     if (!couponSupportsTier(coupon, memberTier)) continue
     if (typeof coupon.usageLimit === 'number' && (coupon.usedCount || 0) >= coupon.usageLimit) continue
 

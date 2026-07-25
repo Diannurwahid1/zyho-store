@@ -273,5 +273,5 @@ export const loginOrCreateGoogleCustomer = async (code: string) => {
     user as User,
   )
 
-  return { cookie }
+  return { cookie, isNewUser: !existingUser }
 }

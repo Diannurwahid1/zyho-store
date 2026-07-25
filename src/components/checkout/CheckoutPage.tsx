@@ -368,6 +368,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
         }
 
         // Account created, now login
+        window.sessionStorage.setItem('welcome-voucher-pending', '1')
         await login({ email: authEmail, password: authPassword })
         toast.success('Akun berhasil dibuat! Selamat datang, member Bronze 🥉')
         router.refresh()

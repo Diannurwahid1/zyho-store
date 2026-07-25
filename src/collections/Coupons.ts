@@ -114,6 +114,24 @@ export const Coupons: CollectionConfig = {
       },
     },
     {
+      name: 'assignedUser',
+      type: 'relationship',
+      relationTo: 'users',
+      admin: {
+        description: 'Jika diisi, voucher ini hanya tampil dan berlaku untuk user tersebut.',
+        position: 'sidebar',
+      },
+    },
+    {
+      name: 'signupVoucherCampaign',
+      type: 'relationship',
+      relationTo: 'signup-voucher-campaigns' as any,
+      admin: {
+        position: 'sidebar',
+        readOnly: true,
+      },
+    },
+    {
       name: 'allowedTiers',
       type: 'select',
       hasMany: true,
