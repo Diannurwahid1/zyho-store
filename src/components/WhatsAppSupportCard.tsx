@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import React from 'react'
 
 import { cn } from '@/utilities/cn'
 
@@ -91,3 +90,4 @@ export function WhatsAppSupportCard({
 }
 
 export { WHATSAPP_ADMIN_URL }
+

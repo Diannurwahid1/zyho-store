@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
 
 // Enable maintenance mode via environment variable
 const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === 'true'
