@@ -346,6 +346,57 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
                 },
               ],
             },
+            {
+              name: 'creatorPromotion',
+              type: 'group',
+              label: 'Creator AI Promotion',
+              admin: {
+                description:
+                  'Kontrol produk yang aman masuk snapshot read-only untuk Jaka Creator dan konten media sosial.',
+              },
+              fields: [
+                {
+                  name: 'enabled',
+                  type: 'checkbox',
+                  defaultValue: false,
+                  label: 'Allow Creator AI promotion',
+                },
+                {
+                  name: 'priority',
+                  type: 'number',
+                  defaultValue: 0,
+                  admin: {
+                    description: 'Angka lebih besar diprioritaskan sebagai topik utama.',
+                  },
+                },
+                {
+                  name: 'allowedAngles',
+                  type: 'select',
+                  hasMany: true,
+                  options: [
+                    { label: 'Promo', value: 'promo' },
+                    { label: 'Education', value: 'education' },
+                    { label: 'Comparison', value: 'comparison' },
+                    { label: 'Use case', value: 'use_case' },
+                    { label: 'Restock', value: 'restock' },
+                    { label: 'Low stock', value: 'low_stock' },
+                    { label: 'Featured', value: 'featured' },
+                  ],
+                },
+                {
+                  name: 'claimNotes',
+                  type: 'textarea',
+                  admin: {
+                    description:
+                      'Klaim marketing yang sudah disetujui admin. Jangan isi klaim yang tidak bisa dipertanggungjawabkan.',
+                  },
+                },
+                {
+                  name: 'ctaLabel',
+                  type: 'text',
+                },
+              ],
+            },
           ],
         },
         {

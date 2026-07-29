@@ -6,6 +6,7 @@ import * as migration_20260714_145643 from './20260714_145643';
 import * as migration_20260715_094745_waitlist_collections from './20260715_094745_waitlist_collections';
 import * as migration_20260715_113749_coupons_applies_to from './20260715_113749_coupons_applies_to';
 import * as migration_20260725_020850_signup_voucher_campaigns from './20260725_020850_signup_voucher_campaigns';
+import * as migration_20260729_111504_creator_creator_snapshot_fields from './20260729_111504_creator_creator_snapshot_fields';
 
 export const migrations = [
   {
@@ -46,6 +47,11 @@ export const migrations = [
   {
     up: migration_20260725_020850_signup_voucher_campaigns.up,
     down: migration_20260725_020850_signup_voucher_campaigns.down,
-    name: '20260725_020850_signup_voucher_campaigns'
+    name: '20260725_020850_signup_voucher_campaigns',
+  },
+  {
+    up: migration_20260729_111504_creator_creator_snapshot_fields.up,
+    down: migration_20260729_111504_creator_creator_snapshot_fields.down,
+    name: '20260729_111504_creator_creator_snapshot_fields'
   },
 ];

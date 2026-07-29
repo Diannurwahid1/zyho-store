@@ -67,6 +67,33 @@ export const Coupons: CollectionConfig = {
       label: 'Benefit Summary',
     },
     {
+      name: 'publicPromotion',
+      type: 'group',
+      label: 'Public Creator Promotion',
+      admin: {
+        description:
+          'Default aman: voucher tidak masuk snapshot AI kecuali diaktifkan eksplisit untuk campaign publik.',
+      },
+      fields: [
+        {
+          name: 'enabled',
+          type: 'checkbox',
+          defaultValue: false,
+          label: 'Allow public promotion',
+        },
+        {
+          name: 'showCode',
+          type: 'checkbox',
+          defaultValue: false,
+          label: 'Show voucher code in snapshot',
+        },
+        {
+          name: 'marketingNotes',
+          type: 'textarea',
+        },
+      ],
+    },
+    {
       name: 'codeMode',
       type: 'select',
       defaultValue: 'manual',

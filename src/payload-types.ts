@@ -84,6 +84,8 @@ export interface Config {
     licenses: License;
     'payment-transactions': PaymentTransaction;
     coupons: Coupon;
+    'signup-voucher-campaigns': SignupVoucherCampaign;
+    'signup-campaign-rewards': SignupCampaignReward;
     'promo-banners': PromoBanner;
     testimonials: Testimonial;
     'support-tickets': SupportTicket;
@@ -93,6 +95,7 @@ export interface Config {
     'stock-ledger': StockLedger;
     waitlists: Waitlist;
     'waitlist-entries': WaitlistEntry;
+    expenses: Expense;
     forms: Form;
     'form-submissions': FormSubmission;
     addresses: Address;
@@ -141,6 +144,8 @@ export interface Config {
     licenses: LicensesSelect<false> | LicensesSelect<true>;
     'payment-transactions': PaymentTransactionsSelect<false> | PaymentTransactionsSelect<true>;
     coupons: CouponsSelect<false> | CouponsSelect<true>;
+    'signup-voucher-campaigns': SignupVoucherCampaignsSelect<false> | SignupVoucherCampaignsSelect<true>;
+    'signup-campaign-rewards': SignupCampaignRewardsSelect<false> | SignupCampaignRewardsSelect<true>;
     'promo-banners': PromoBannersSelect<false> | PromoBannersSelect<true>;
     testimonials: TestimonialsSelect<false> | TestimonialsSelect<true>;
     'support-tickets': SupportTicketsSelect<false> | SupportTicketsSelect<true>;
@@ -150,6 +155,7 @@ export interface Config {
     'stock-ledger': StockLedgerSelect<false> | StockLedgerSelect<true>;
     waitlists: WaitlistsSelect<false> | WaitlistsSelect<true>;
     'waitlist-entries': WaitlistEntriesSelect<false> | WaitlistEntriesSelect<true>;
+    expenses: ExpensesSelect<false> | ExpensesSelect<true>;
     forms: FormsSelect<false> | FormsSelect<true>;
     'form-submissions': FormSubmissionsSelect<false> | FormSubmissionsSelect<true>;
     addresses: AddressesSelect<false> | AddressesSelect<true>;
@@ -497,6 +503,10 @@ export interface Product {
   refundPolicy?: string | null;
   isFeatured?: boolean | null;
   badge?: ('new' | 'best_seller' | 'discount') | null;
+  /**
+   * Jumlah produk yang sudah terjual. Bisa diinput manual untuk ditampilkan di storefront.
+   */
+  soldCount?: number | null;
   digitalAssets?: {
     docs?: (number | DigitalAsset)[];
     hasNextPage?: boolean;
@@ -517,6 +527,22 @@ export interface Product {
      */
     discountPercent?: number | null;
     flashSaleEndDate?: string | null;
+  };
+  /**
+   * Kontrol produk yang aman masuk snapshot read-only untuk Jaka Creator dan konten media sosial.
+   */
+  creatorPromotion?: {
+    enabled?: boolean | null;
+    /**
+     * Angka lebih besar diprioritaskan sebagai topik utama.
+     */
+    priority?: number | null;
+    allowedAngles?: ('promo' | 'education' | 'comparison' | 'use_case' | 'restock' | 'low_stock' | 'featured')[] | null;
+    /**
+     * Klaim marketing yang sudah disetujui admin. Jangan isi klaim yang tidak bisa dipertanggungjawabkan.
+     */
+    claimNotes?: string | null;
+    ctaLabel?: string | null;
   };
   meta?: {
     title?: string | null;
@@ -1245,6 +1271,14 @@ export interface StockLedger {
    */
   performedBy?: (number | null) | User;
   /**
+   * Harga modal per unit (Rp). Diisi saat restock untuk mencatat pengeluaran.
+   */
+  costPerUnit?: number | null;
+  /**
+   * Total pengeluaran modal (costPerUnit × qty). Otomatis dihitung.
+   */
+  totalCost?: number | null;
+  /**
    * Catatan tambahan.
    */
   notes?: string | null;
@@ -1328,6 +1362,14 @@ export interface Coupon {
   title: string;
   description?: string | null;
   benefitSummary?: string | null;
+  /**
+   * Default aman: voucher tidak masuk snapshot AI kecuali diaktifkan eksplisit untuk campaign publik.
+   */
+  publicPromotion?: {
+    enabled?: boolean | null;
+    showCode?: boolean | null;
+    marketingNotes?: string | null;
+  };
   codeMode: 'manual' | 'auto';
   /**
    * Prefix untuk kode otomatis, mis. MEMBER atau GOLD.
@@ -1341,6 +1383,11 @@ export interface Coupon {
    * Pilih produk yang bisa menggunakan voucher ini.
    */
   products?: (number | Product)[] | null;
+  /**
+   * Jika diisi, voucher ini hanya tampil dan berlaku untuk user tersebut.
+   */
+  assignedUser?: (number | null) | User;
+  signupVoucherCampaign?: (number | null) | SignupVoucherCampaign;
   allowedTiers?: ('bronze' | 'silver' | 'gold' | 'diamond')[] | null;
   minimumSpend?: number | null;
   usageLimit?: number | null;
@@ -1356,6 +1403,59 @@ export interface Coupon {
   sendWhatsAppBlast?: boolean | null;
   whatsAppBlastSentAt?: string | null;
   whatsAppBlastRecipientCount?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "signup-voucher-campaigns".
+ */
+export interface SignupVoucherCampaign {
+  id: number;
+  title: string;
+  description?: string | null;
+  status: 'draft' | 'active' | 'inactive' | 'ended';
+  /**
+   * Campaign dengan priority tertinggi akan dipilih saat ada lebih dari satu yang aktif.
+   */
+  priority?: number | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  appliesTo: 'all' | 'specific';
+  /**
+   * Pilih produk yang berlaku untuk voucher hasil campaign ini.
+   */
+  products?: (number | Product)[] | null;
+  /**
+   * Prefix default kode voucher jika bucket tidak menentukan prefix sendiri.
+   */
+  codePrefix?: string | null;
+  rewardBuckets?:
+    | {
+        label: string;
+        voucherTitle?: string | null;
+        description?: string | null;
+        benefitSummary?: string | null;
+        isActive?: boolean | null;
+        discountType: 'percentage' | 'fixed';
+        amount: number;
+        /**
+         * Bobot peluang relatif. Semua user tetap mendapat salah satu voucher aktif.
+         */
+        probabilityWeight: number;
+        /**
+         * Kosongkan jika hadiah ini tidak dibatasi kuota total pemenangnya.
+         */
+        maxTotalWinners?: number | null;
+        minimumSpend?: number | null;
+        usageLimit?: number | null;
+        perUserLimit?: number | null;
+        codePrefix?: string | null;
+        ttlHours?: number | null;
+        expiresAt?: string | null;
+        id?: string | null;
+      }[]
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1520,6 +1620,24 @@ export interface PaymentTransaction {
     | number
     | boolean
     | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "signup-campaign-rewards".
+ */
+export interface SignupCampaignReward {
+  id: number;
+  user: number | User;
+  campaign: number | SignupVoucherCampaign;
+  voucher?: (number | null) | Coupon;
+  result: 'pending' | 'won' | 'lost' | 'skipped';
+  bucketID?: string | null;
+  bucketLabel?: string | null;
+  userCampaignKey: string;
+  claimKey?: string | null;
+  reason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1712,6 +1830,29 @@ export interface WaitlistEntry {
   createdAt: string;
 }
 /**
+ * Catatan pengeluaran / kas keluar toko.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "expenses".
+ */
+export interface Expense {
+  id: number;
+  date: string;
+  category: 'operational' | 'stock_purchase' | 'marketing' | 'salary' | 'subscription' | 'server' | 'refund' | 'other';
+  description: string;
+  amount: number;
+  paymentMethod: 'transfer' | 'cash' | 'ewallet' | 'qris' | 'credit_card' | 'other';
+  referenceNumber?: string | null;
+  /**
+   * Upload foto struk atau bukti pembayaran (opsional).
+   */
+  receipt?: (number | null) | Media;
+  notes?: string | null;
+  recordedBy?: (number | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "form-submissions".
  */
@@ -1801,6 +1942,14 @@ export interface PayloadLockedDocument {
         value: number | Coupon;
       } | null)
     | ({
+        relationTo: 'signup-voucher-campaigns';
+        value: number | SignupVoucherCampaign;
+      } | null)
+    | ({
+        relationTo: 'signup-campaign-rewards';
+        value: number | SignupCampaignReward;
+      } | null)
+    | ({
         relationTo: 'promo-banners';
         value: number | PromoBanner;
       } | null)
@@ -1835,6 +1984,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'waitlist-entries';
         value: number | WaitlistEntry;
+      } | null)
+    | ({
+        relationTo: 'expenses';
+        value: number | Expense;
       } | null)
     | ({
         relationTo: 'forms';
@@ -2292,6 +2445,13 @@ export interface CouponsSelect<T extends boolean = true> {
   title?: T;
   description?: T;
   benefitSummary?: T;
+  publicPromotion?:
+    | T
+    | {
+        enabled?: T;
+        showCode?: T;
+        marketingNotes?: T;
+      };
   codeMode?: T;
   codePrefix?: T;
   code?: T;
@@ -2299,6 +2459,8 @@ export interface CouponsSelect<T extends boolean = true> {
   amount?: T;
   appliesTo?: T;
   products?: T;
+  assignedUser?: T;
+  signupVoucherCampaign?: T;
   allowedTiers?: T;
   minimumSpend?: T;
   usageLimit?: T;
@@ -2311,6 +2473,60 @@ export interface CouponsSelect<T extends boolean = true> {
   sendWhatsAppBlast?: T;
   whatsAppBlastSentAt?: T;
   whatsAppBlastRecipientCount?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "signup-voucher-campaigns_select".
+ */
+export interface SignupVoucherCampaignsSelect<T extends boolean = true> {
+  title?: T;
+  description?: T;
+  status?: T;
+  priority?: T;
+  startsAt?: T;
+  endsAt?: T;
+  appliesTo?: T;
+  products?: T;
+  codePrefix?: T;
+  rewardBuckets?:
+    | T
+    | {
+        label?: T;
+        voucherTitle?: T;
+        description?: T;
+        benefitSummary?: T;
+        isActive?: T;
+        discountType?: T;
+        amount?: T;
+        probabilityWeight?: T;
+        maxTotalWinners?: T;
+        minimumSpend?: T;
+        usageLimit?: T;
+        perUserLimit?: T;
+        codePrefix?: T;
+        ttlHours?: T;
+        expiresAt?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "signup-campaign-rewards_select".
+ */
+export interface SignupCampaignRewardsSelect<T extends boolean = true> {
+  user?: T;
+  campaign?: T;
+  voucher?: T;
+  result?: T;
+  bucketID?: T;
+  bucketLabel?: T;
+  userCampaignKey?: T;
+  claimKey?: T;
+  reason?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2427,6 +2643,8 @@ export interface StockLedgerSelect<T extends boolean = true> {
   order?: T;
   customer?: T;
   performedBy?: T;
+  costPerUnit?: T;
+  totalCost?: T;
   notes?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -2457,6 +2675,23 @@ export interface WaitlistEntriesSelect<T extends boolean = true> {
   quantity?: T;
   status?: T;
   notifiedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "expenses_select".
+ */
+export interface ExpensesSelect<T extends boolean = true> {
+  date?: T;
+  category?: T;
+  description?: T;
+  amount?: T;
+  paymentMethod?: T;
+  referenceNumber?: T;
+  receipt?: T;
+  notes?: T;
+  recordedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -2728,6 +2963,7 @@ export interface ProductsSelect<T extends boolean = true> {
   refundPolicy?: T;
   isFeatured?: T;
   badge?: T;
+  soldCount?: T;
   digitalAssets?: T;
   digitalStockUnits?: T;
   promo?:
@@ -2736,6 +2972,15 @@ export interface ProductsSelect<T extends boolean = true> {
         isFlashSale?: T;
         discountPercent?: T;
         flashSaleEndDate?: T;
+      };
+  creatorPromotion?:
+    | T
+    | {
+        enabled?: T;
+        priority?: T;
+        allowedAngles?: T;
+        claimNotes?: T;
+        ctaLabel?: T;
       };
   meta?:
     | T
