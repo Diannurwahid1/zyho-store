@@ -271,9 +271,8 @@ export async function buildCreatorCatalogSnapshot(
 
   const signupCampaignVouchers = signupCampaignsResult.docs
     .filter((campaign: any) => isSignupCampaignActive(campaign, generatedAt))
-    .filter((campaign: any) => signupCampaignMatchesProducts(campaign, productIds))
     .sort((a: any, b: any) => (b.priority || 0) - (a.priority || 0))
-    .flatMap((campaign: any) => serializeSignupCampaignVouchers(campaign, productIds, generatedAt))
+    .flatMap((campaign: any) => serializeSignupCampaignVouchers(campaign, generatedAt))
 
   const vouchers = [...publicCoupons, ...signupCampaignVouchers].slice(0, 20)
 
@@ -450,21 +449,13 @@ function isSignupCampaignActive(campaign: any, now: Date): boolean {
   return getActiveSignupRewardBuckets(campaign, now).length > 0
 }
 
-function signupCampaignMatchesProducts(campaign: any, snapshotProductIds: Set<string>): boolean {
-  if (campaign.appliesTo === 'all') return snapshotProductIds.size > 0
-
-  const campaignProductIds = normalizeRelationshipIDs(campaign.products)
-  return campaignProductIds.some((productId) => snapshotProductIds.has(productId))
-}
-
 function serializeSignupCampaignVouchers(
   campaign: any,
-  snapshotProductIds: Set<string>,
   now: Date,
 ): CreatorVoucher[] {
   const campaignProductIds =
     campaign.appliesTo === 'specific'
-      ? normalizeRelationshipIDs(campaign.products).filter((productId) => snapshotProductIds.has(productId))
+      ? normalizeRelationshipIDs(campaign.products)
       : []
 
   return getActiveSignupRewardBuckets(campaign, now).map(({ bucket, bucketID }) => ({

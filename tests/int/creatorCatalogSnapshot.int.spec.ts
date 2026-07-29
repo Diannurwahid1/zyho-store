@@ -286,7 +286,7 @@ function createPayloadMock() {
               startsAt: '2026-07-01T00:00:00.000Z',
               endsAt: '2026-08-01T00:00:00.000Z',
               appliesTo: 'specific',
-              products: [7],
+              products: [999],
               rewardBuckets: [
                 {
                   id: 'bucket-a',
