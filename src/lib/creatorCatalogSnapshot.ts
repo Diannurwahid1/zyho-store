@@ -391,7 +391,7 @@ function serializeCoupon(coupon: any): CreatorVoucher {
     id: String(coupon.id),
     title: coupon.title,
     description: coupon.description || null,
-    benefitSummary: coupon.benefitSummary || null,
+    benefitSummary: coupon.benefitSummary || createCouponBenefitSummary(coupon),
     discountType: coupon.discountType,
     amount: coupon.amount,
     minimumSpend: typeof coupon.minimumSpend === 'number' ? coupon.minimumSpend : 0,
@@ -409,6 +409,26 @@ function serializeCoupon(coupon: any): CreatorVoucher {
   }
 
   return voucher
+}
+
+function createCouponBenefitSummary(coupon: any): string | null {
+  const amount = typeof coupon.amount === 'number' ? coupon.amount : null
+  if (amount === null) return null
+
+  const minimumSpend =
+    typeof coupon.minimumSpend === 'number' && coupon.minimumSpend > 0
+      ? ` min. belanja Rp${formatIDR(coupon.minimumSpend)}`
+      : ''
+
+  if (coupon.discountType === 'percentage') {
+    return `Diskon ${amount}%${minimumSpend}`
+  }
+
+  if (coupon.discountType === 'fixed') {
+    return `Diskon Rp${formatIDR(amount)}${minimumSpend}`
+  }
+
+  return null
 }
 
 function isPromoBannerActive(promo: any, now: Date): boolean {
@@ -472,4 +492,10 @@ function normalizeRelationshipDocs(value: unknown): any[] {
 
 function numberOrNull(value: unknown): number | null {
   return typeof value === 'number' ? value : null
+}
+
+function formatIDR(value: number): string {
+  return new Intl.NumberFormat('id-ID', {
+    maximumFractionDigits: 0,
+  }).format(value)
 }

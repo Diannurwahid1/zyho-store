@@ -49,6 +49,7 @@ describe('creator catalog snapshot', () => {
     expect(snapshot.products[0]?.flashSale?.active).toBe(true)
     expect(snapshot.vouchers).toHaveLength(1)
     expect(snapshot.vouchers[0]?.code).toBe('ZYHO10')
+    expect(snapshot.vouchers[0]?.benefitSummary).toBe('Diskon 10% min. belanja Rp100.000')
     expect(snapshot.promos).toHaveLength(1)
     expect(etag).toBe(createCreatorCatalogETag(snapshot))
 
@@ -205,7 +206,7 @@ function createPayloadMock() {
               id: 21,
               title: 'Promo Akhir Bulan',
               description: 'Syarat singkat',
-              benefitSummary: 'Diskon 10%',
+              benefitSummary: null,
               code: 'ZYHO10',
               discountType: 'percentage',
               amount: 10,
