@@ -145,7 +145,7 @@ export async function buildCreatorCatalogSnapshot(
   const baseUrl = normalizeBaseUrl(opts.baseUrl || process.env.NEXT_PUBLIC_STORE_URL || process.env.NEXT_PUBLIC_SERVER_URL || 'https://zyho.store')
   const nowISO = generatedAt.toISOString()
 
-  const [productsResult, couponsResult, promoBannersResult] = await Promise.all([
+  const [productsResult, couponsResult, promoBannersResult, signupCampaignsResult] = await Promise.all([
     payload.find({
       collection: 'products',
       depth: 2,
@@ -229,6 +229,27 @@ export async function buildCreatorCatalogSnapshot(
         status: { equals: 'published' },
       },
     }),
+    payload.find({
+      collection: 'signup-voucher-campaigns' as any,
+      depth: 1,
+      limit: 20,
+      overrideAccess: true,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        priority: true,
+        startsAt: true,
+        endsAt: true,
+        appliesTo: true,
+        products: true,
+        rewardBuckets: true,
+      } as any,
+      where: {
+        status: { equals: 'active' },
+      },
+    }),
   ])
 
   const products = (
@@ -240,11 +261,21 @@ export async function buildCreatorCatalogSnapshot(
     .sort(sortCreatorProducts)
     .slice(0, 50)
 
-  const vouchers = couponsResult.docs
+  const productIds = new Set(products.map((product) => product.id))
+
+  const publicCoupons = couponsResult.docs
     .filter((coupon: any) => isPublicCouponActive(coupon, generatedAt))
     .sort((a: any, b: any) => (new Date(a.expiresAt || 0).getTime() || 0) - (new Date(b.expiresAt || 0).getTime() || 0))
     .slice(0, 20)
     .map((coupon: any) => serializeCoupon(coupon))
+
+  const signupCampaignVouchers = signupCampaignsResult.docs
+    .filter((campaign: any) => isSignupCampaignActive(campaign, generatedAt))
+    .filter((campaign: any) => signupCampaignMatchesProducts(campaign, productIds))
+    .sort((a: any, b: any) => (b.priority || 0) - (a.priority || 0))
+    .flatMap((campaign: any) => serializeSignupCampaignVouchers(campaign, productIds, generatedAt))
+
+  const vouchers = [...publicCoupons, ...signupCampaignVouchers].slice(0, 20)
 
   const promos = promoBannersResult.docs
     .filter((promo: any) => isPromoBannerActive(promo, generatedAt))
@@ -411,6 +442,69 @@ function serializeCoupon(coupon: any): CreatorVoucher {
   return voucher
 }
 
+function isSignupCampaignActive(campaign: any, now: Date): boolean {
+  if (campaign.status !== 'active') return false
+  if (campaign.startsAt && new Date(campaign.startsAt).getTime() > now.getTime()) return false
+  if (campaign.endsAt && new Date(campaign.endsAt).getTime() <= now.getTime()) return false
+
+  return getActiveSignupRewardBuckets(campaign, now).length > 0
+}
+
+function signupCampaignMatchesProducts(campaign: any, snapshotProductIds: Set<string>): boolean {
+  if (campaign.appliesTo === 'all') return snapshotProductIds.size > 0
+
+  const campaignProductIds = normalizeRelationshipIDs(campaign.products)
+  return campaignProductIds.some((productId) => snapshotProductIds.has(productId))
+}
+
+function serializeSignupCampaignVouchers(
+  campaign: any,
+  snapshotProductIds: Set<string>,
+  now: Date,
+): CreatorVoucher[] {
+  const campaignProductIds =
+    campaign.appliesTo === 'specific'
+      ? normalizeRelationshipIDs(campaign.products).filter((productId) => snapshotProductIds.has(productId))
+      : []
+
+  return getActiveSignupRewardBuckets(campaign, now).map(({ bucket, bucketID }) => ({
+    id: `signup-campaign:${campaign.id}:${bucketID}`,
+    title: bucket.voucherTitle || `${campaign.title} - ${bucket.label || 'Voucher signup'}`,
+    description: bucket.description || campaign.description || 'Voucher otomatis untuk member baru setelah daftar.',
+    benefitSummary: bucket.benefitSummary || createCouponBenefitSummary(bucket),
+    discountType: bucket.discountType,
+    amount: typeof bucket.amount === 'number' ? bucket.amount : 0,
+    minimumSpend: typeof bucket.minimumSpend === 'number' ? bucket.minimumSpend : 0,
+    appliesTo: campaign.appliesTo === 'specific' ? 'specific' : 'all',
+    productIds: campaignProductIds,
+    allowedTiers: [],
+    remainingUses: null,
+    startsAt: campaign.startsAt || null,
+    expiresAt: bucket.expiresAt || campaign.endsAt || null,
+    marketingNotes: 'Voucher signup untuk member baru. Kode dibuat personal setelah user daftar.',
+  }))
+}
+
+function getActiveSignupRewardBuckets(
+  campaign: any,
+  now: Date,
+): Array<{ bucket: any; bucketID: string }> {
+  if (!Array.isArray(campaign.rewardBuckets)) return []
+
+  return campaign.rewardBuckets
+    .map((bucket: any, index: number) => ({
+      bucket,
+      bucketID: String(bucket?.id || `bucket-${index}`),
+    }))
+    .filter(({ bucket }: { bucket: any; bucketID: string }) => {
+      if (!bucket || bucket.isActive === false) return false
+      if (typeof bucket.amount !== 'number' || bucket.amount <= 0) return false
+      if (bucket.discountType !== 'percentage' && bucket.discountType !== 'fixed') return false
+      if (bucket.expiresAt && new Date(bucket.expiresAt).getTime() <= now.getTime()) return false
+      return true
+    })
+}
+
 function createCouponBenefitSummary(coupon: any): string | null {
   const amount = typeof coupon.amount === 'number' ? coupon.amount : null
   if (amount === null) return null
@@ -487,6 +581,22 @@ function normalizeRelationshipDocs(value: unknown): any[] {
   if (typeof value === 'object' && value !== null && Array.isArray((value as any).docs)) {
     return (value as any).docs.filter((item: unknown) => typeof item === 'object' && item !== null)
   }
+  return []
+}
+
+function normalizeRelationshipIDs(value: unknown): string[] {
+  if (!value) return []
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === 'number' || typeof item === 'string') return String(item)
+        if (item && typeof item === 'object' && 'id' in item) return String((item as any).id)
+        return null
+      })
+      .filter((id): id is string => Boolean(id))
+  }
+
   return []
 }
 

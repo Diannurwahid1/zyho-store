@@ -47,9 +47,12 @@ describe('creator catalog snapshot', () => {
       label: 'Tersedia',
     })
     expect(snapshot.products[0]?.flashSale?.active).toBe(true)
-    expect(snapshot.vouchers).toHaveLength(1)
+    expect(snapshot.vouchers).toHaveLength(2)
     expect(snapshot.vouchers[0]?.code).toBe('ZYHO10')
     expect(snapshot.vouchers[0]?.benefitSummary).toBe('Diskon 10% min. belanja Rp100.000')
+    expect(snapshot.vouchers[1]?.id).toBe('signup-campaign:31:bucket-a')
+    expect(snapshot.vouchers[1]?.benefitSummary).toBe('Diskon Rp25.000')
+    expect(snapshot.vouchers[1]).not.toHaveProperty('code')
     expect(snapshot.promos).toHaveLength(1)
     expect(etag).toBe(createCreatorCatalogETag(snapshot))
 
@@ -266,6 +269,36 @@ function createPayloadMock() {
               priority: 10,
               startDate: '2026-07-29T00:00:00.000Z',
               endDate: '2026-08-02T16:59:59.000Z',
+            },
+          ],
+        }
+      }
+
+      if (collection === 'signup-voucher-campaigns') {
+        return {
+          docs: [
+            {
+              id: 31,
+              title: 'Welcome Member Baru',
+              description: 'Daftar akun dan dapat voucher welcome.',
+              status: 'active',
+              priority: 20,
+              startsAt: '2026-07-01T00:00:00.000Z',
+              endsAt: '2026-08-01T00:00:00.000Z',
+              appliesTo: 'specific',
+              products: [7],
+              rewardBuckets: [
+                {
+                  id: 'bucket-a',
+                  label: 'Welcome 25K',
+                  voucherTitle: 'Voucher Member Baru',
+                  isActive: true,
+                  discountType: 'fixed',
+                  amount: 25000,
+                  probabilityWeight: 100,
+                  minimumSpend: 0,
+                },
+              ],
             },
           ],
         }
