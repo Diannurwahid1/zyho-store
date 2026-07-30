@@ -32,6 +32,12 @@ export async function GET() {
           { status: { equals: 'active' } },
           {
             or: [
+              { assignedUser: { exists: false } },
+              { assignedUser: { equals: null } },
+            ],
+          },
+          {
+            or: [
               { startsAt: { less_than_equal: now } },
               { startsAt: { exists: false } },
             ],
