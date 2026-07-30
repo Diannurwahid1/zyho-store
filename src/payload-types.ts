@@ -503,6 +503,7 @@ export interface Product {
   refundPolicy?: string | null;
   isFeatured?: boolean | null;
   badge?: ('new' | 'best_seller' | 'discount') | null;
+  customBadge?: string | null;
   /**
    * Jumlah produk yang sudah terjual. Bisa diinput manual untuk ditampilkan di storefront.
    */
@@ -2963,6 +2964,7 @@ export interface ProductsSelect<T extends boolean = true> {
   refundPolicy?: T;
   isFeatured?: T;
   badge?: T;
+  customBadge?: T;
   soldCount?: T;
   digitalAssets?: T;
   digitalStockUnits?: T;

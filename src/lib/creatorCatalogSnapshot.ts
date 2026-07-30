@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 
 import { getAvailableStock } from '@/lib/stock'
+import { getProductBadgeLabel } from '@/utilities/productBadge'
 import type { BasePayload } from 'payload'
 
 const SCHEMA_VERSION = '1'
@@ -165,6 +166,7 @@ export async function buildCreatorCatalogSnapshot(
         variants: true,
         isFeatured: true,
         badge: true,
+        customBadge: true,
         soldCount: true,
         promo: true,
         creatorPromotion: true,
@@ -334,7 +336,7 @@ async function serializeProduct(
       USD: numberOrNull(product.priceInUSD),
     },
     availability,
-    badge: product.badge || null,
+    badge: getProductBadgeLabel(product),
     isFeatured: product.isFeatured === true,
     soldCount: typeof product.soldCount === 'number' ? product.soldCount : 0,
     ...(flashSale ? { flashSale } : {}),

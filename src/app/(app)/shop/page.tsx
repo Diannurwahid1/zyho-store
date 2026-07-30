@@ -38,6 +38,7 @@ export default async function ShopPage({ searchParams }: Props) {
       priceInUSD: true,
       shortDescription: true,
       badge: true,
+      customBadge: true,
       soldCount: true,
       promo: true,
     },

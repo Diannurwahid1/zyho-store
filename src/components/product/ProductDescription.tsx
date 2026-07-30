@@ -6,6 +6,7 @@ import { DiscountedPrice } from '@/components/DiscountedPrice'
 import { Price } from '@/components/Price'
 import { RichText } from '@/components/RichText'
 import { gaViewItem } from '@/utilities/googleAnalytics'
+import { getProductBadgeLabel } from '@/utilities/productBadge'
 import { Suspense, useEffect } from 'react'
 
 import { StockIndicator } from '@/components/product/StockIndicator'
@@ -14,6 +15,7 @@ import { VariantSelector } from './VariantSelector'
 
 export function ProductDescription({ product }: { product: Product }) {
   const { currency } = useCurrency()
+  const badgeLabel = getProductBadgeLabel(product as any)
   let amount = 0,
     lowestAmount = 0,
     highestAmount = 0
@@ -64,9 +66,9 @@ export function ProductDescription({ product }: { product: Product }) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap gap-2">
-          {product.badge ? (
+          {badgeLabel ? (
             <span className="w-fit rounded-full bg-foreground px-3 py-1 text-xs font-medium uppercase tracking-wide text-background">
-              {product.badge.replace('_', ' ')}
+              {badgeLabel}
             </span>
           ) : null}
           <span className="w-fit rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">

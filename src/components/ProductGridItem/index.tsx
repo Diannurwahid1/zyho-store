@@ -3,6 +3,7 @@ import type { Product } from '@/payload-types'
 import { DiscountedPrice } from '@/components/DiscountedPrice'
 import { Media } from '@/components/Media'
 import { ProductCardActions } from '@/components/ProductCardActions'
+import { getProductBadgeLabel } from '@/utilities/productBadge'
 import clsx from 'clsx'
 import Link from 'next/link'
 import React from 'react'
@@ -12,8 +13,9 @@ type Props = {
 }
 
 export const ProductGridItem: React.FC<Props> = ({ product }) => {
-  const { badge, gallery, priceInUSD, priceInIDR, shortDescription, title } = product
+  const { gallery, priceInUSD, priceInIDR, shortDescription, title } = product
   const soldCount = (product as any).soldCount as number | undefined
+  const badgeLabel = getProductBadgeLabel(product as any)
 
   let price = priceInUSD
   let priceIDR = priceInIDR
@@ -50,9 +52,9 @@ export const ProductGridItem: React.FC<Props> = ({ product }) => {
           <span className="absolute left-1.5 top-1.5 z-10 rounded-full bg-red-600 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-white md:left-4 md:top-4 md:px-3 md:py-1 md:text-xs">
             Habis Terjual
           </span>
-        ) : badge ? (
+        ) : badgeLabel ? (
           <span className="absolute left-1.5 top-1.5 z-10 rounded-full bg-foreground px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-wide text-background md:left-4 md:top-4 md:px-3 md:py-1 md:text-xs">
-            {badge.replace('_', ' ')}
+            {badgeLabel}
           </span>
         ) : null}
 

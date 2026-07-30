@@ -7,6 +7,7 @@ import * as migration_20260715_094745_waitlist_collections from './20260715_0947
 import * as migration_20260715_113749_coupons_applies_to from './20260715_113749_coupons_applies_to';
 import * as migration_20260725_020850_signup_voucher_campaigns from './20260725_020850_signup_voucher_campaigns';
 import * as migration_20260729_111504_creator_creator_snapshot_fields from './20260729_111504_creator_creator_snapshot_fields';
+import * as migration_20260730_103500_products_custom_badge from './20260730_103500_products_custom_badge';
 
 export const migrations = [
   {
@@ -53,5 +54,10 @@ export const migrations = [
     up: migration_20260729_111504_creator_creator_snapshot_fields.up,
     down: migration_20260729_111504_creator_creator_snapshot_fields.down,
     name: '20260729_111504_creator_creator_snapshot_fields'
+  },
+  {
+    up: migration_20260730_103500_products_custom_badge.up,
+    down: migration_20260730_103500_products_custom_badge.down,
+    name: '20260730_103500_products_custom_badge',
   },
 ];

@@ -125,6 +125,7 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
     priceInIDR: true,
     inventory: true,
     soldCount: true,
+    customBadge: true,
     meta: true,
   },
   fields: [
@@ -335,6 +336,15 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
             { name: 'refundPolicy', type: 'textarea' },
             { name: 'isFeatured', type: 'checkbox', defaultValue: false },
             { name: 'badge', type: 'select', options: ['new', 'best_seller', 'discount'] },
+            {
+              name: 'customBadge',
+              type: 'text',
+              label: 'Badge Manual',
+              admin: {
+                description:
+                  'Isi badge custom manual untuk storefront. Jika diisi, badge ini akan menggantikan badge preset.',
+              },
+            },
             {
               name: 'soldCount',
               type: 'number',

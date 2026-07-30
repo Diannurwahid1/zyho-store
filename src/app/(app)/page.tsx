@@ -115,6 +115,9 @@ export default async function Page() {
       priceInUSD: typeof product.priceInUSD === 'number' ? product.priceInUSD : undefined,
       inventory: product.inventory || 0,
       soldCount: typeof (product as any).soldCount === 'number' ? (product as any).soldCount : 0,
+      badge: typeof (product as any).badge === 'string' ? (product as any).badge : undefined,
+      customBadge:
+        typeof (product as any).customBadge === 'string' ? (product as any).customBadge : undefined,
       enableVariants: product.enableVariants || false,
       variants: product.variants?.docs
         ?.filter((variant) => typeof variant === 'object' && variant !== null)
