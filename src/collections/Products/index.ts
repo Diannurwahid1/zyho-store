@@ -20,10 +20,69 @@ import {
 } from '@payloadcms/richtext-lexical'
 import { DefaultDocumentIDType, slugField, Where } from 'payload'
 
+const STAFF_ROLES = new Set(['admin', 'manager', 'finance', 'support'])
+
+const shouldUseManualSoldCountOnly = (req: any) => {
+  const roles = Array.isArray(req?.user?.roles) ? req.user.roles : []
+  return roles.some((role: string) => STAFF_ROLES.has(role))
+}
+
+const getSoldCountCache = async (req: any) => {
+  if (!req?.context) req.context = {}
+  if (req.context.productSoldCountCache) return req.context.productSoldCountCache as Record<string, number>
+
+  const { docs: orders } = await req.payload.find({
+    collection: 'orders',
+    depth: 0,
+    limit: 1000,
+    overrideAccess: true,
+    pagination: false,
+    req,
+    where: {
+      status: {
+        equals: 'completed',
+      },
+    },
+  })
+
+  const soldCountByProduct: Record<string, number> = {}
+
+  for (const order of orders as any[]) {
+    const items = Array.isArray(order?.items) ? order.items : []
+    for (const item of items) {
+      const productId = typeof item?.product === 'object' ? item.product?.id : item?.product
+      const quantity = typeof item?.quantity === 'number' && item.quantity > 0 ? item.quantity : 0
+
+      if (!productId || quantity <= 0) continue
+
+      const key = String(productId)
+      soldCountByProduct[key] = (soldCountByProduct[key] || 0) + quantity
+    }
+  }
+
+  req.context.productSoldCountCache = soldCountByProduct
+  return soldCountByProduct
+}
+
 export const ProductsCollection: CollectionOverride = ({ defaultCollection }) => ({
   ...defaultCollection,
   hooks: {
     ...defaultCollection.hooks,
+    afterRead: [
+      ...(defaultCollection.hooks?.afterRead || []),
+      async ({ doc, req }) => {
+        if (!doc || shouldUseManualSoldCountOnly(req)) return doc
+
+        const soldCountByProduct = await getSoldCountCache(req)
+        const manualSoldCount = typeof doc.soldCount === 'number' ? doc.soldCount : 0
+        const actualSoldCount = soldCountByProduct[String(doc.id)] || 0
+
+        return {
+          ...doc,
+          soldCount: manualSoldCount + actualSoldCount,
+        }
+      },
+    ],
     beforeChange: [
       ...(defaultCollection.hooks?.beforeChange || []),
       (args) => validateDualCurrencyPricing(args, 'Produk'),
