@@ -26,8 +26,7 @@ export function ProductDescription({ product }: { product: Product }) {
   const hasUpdatePolicy = normalizedUpdatePolicy.length > 0
   const hasRefundPolicy = normalizedRefundPolicy.length > 0
   const requiresPolicyConsent = hasUpdatePolicy || hasRefundPolicy
-  const [updateChecked, setUpdateChecked] = useState(!hasUpdatePolicy)
-  const [refundChecked, setRefundChecked] = useState(!hasRefundPolicy)
+  const [policyChecked, setPolicyChecked] = useState(!requiresPolicyConsent)
   let amount = 0,
     lowestAmount = 0,
     highestAmount = 0
@@ -75,14 +74,13 @@ export function ProductDescription({ product }: { product: Product }) {
   }, [currency.code, product])
 
   useEffect(() => {
-    setUpdateChecked(!hasUpdatePolicy)
-    setRefundChecked(!hasRefundPolicy)
-  }, [hasRefundPolicy, hasUpdatePolicy, product.id])
+    setPolicyChecked(!requiresPolicyConsent)
+  }, [product.id, requiresPolicyConsent])
 
   const policyConsentComplete = useMemo(() => {
     if (!requiresPolicyConsent) return true
-    return updateChecked && refundChecked
-  }, [refundChecked, requiresPolicyConsent, updateChecked])
+    return policyChecked
+  }, [policyChecked, requiresPolicyConsent])
 
   return (
     <div className="flex flex-col gap-6">
@@ -136,61 +134,44 @@ export function ProductDescription({ product }: { product: Product }) {
       <div className="rounded-2xl border bg-background p-4">
         {requiresPolicyConsent ? (
           <div className="mb-4 flex flex-col gap-3">
-            {hasUpdatePolicy ? (
-              <div className="rounded-2xl border border-border/70 bg-background p-3">
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    id={`update-policy-${product.id}`}
-                    checked={updateChecked}
-                    onCheckedChange={(checked) => setUpdateChecked(Boolean(checked))}
-                    className="mt-0.5"
-                  />
-                  <div className="flex-1">
-                    <label
-                      htmlFor={`update-policy-${product.id}`}
-                      className="block text-sm font-medium leading-6"
-                    >
-                      Saya sudah baca Update Policy
-                    </label>
-                    <Button
-                      asChild
-                      variant="link"
-                      className="mt-1 h-auto justify-start p-0 text-sm text-blue-700 hover:text-blue-600"
-                    >
-                      <Link href="#update-policy">Buka Update Policy</Link>
-                    </Button>
+            <div className="rounded-2xl border border-border/70 bg-background p-3">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id={`policy-check-${product.id}`}
+                  checked={policyChecked}
+                  onCheckedChange={(checked) => setPolicyChecked(Boolean(checked))}
+                  className="mt-0.5"
+                />
+                <div className="flex-1">
+                  <label
+                    htmlFor={`policy-check-${product.id}`}
+                    className="block text-sm font-medium leading-6"
+                  >
+                    Saya sudah baca policy produk ini
+                  </label>
+                  <div className="mt-1 flex flex-col items-start gap-1">
+                    {hasUpdatePolicy ? (
+                      <Button
+                        asChild
+                        variant="link"
+                        className="h-auto justify-start p-0 text-sm text-blue-700 hover:text-blue-600"
+                      >
+                        <Link href="#update-policy">Buka Update Policy</Link>
+                      </Button>
+                    ) : null}
+                    {hasRefundPolicy ? (
+                      <Button
+                        asChild
+                        variant="link"
+                        className="h-auto justify-start p-0 text-sm text-blue-700 hover:text-blue-600"
+                      >
+                        <Link href="#refund-policy">Buka Refund Policy</Link>
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               </div>
-            ) : null}
-
-            {hasRefundPolicy ? (
-              <div className="rounded-2xl border border-border/70 bg-background p-3">
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    id={`refund-policy-${product.id}`}
-                    checked={refundChecked}
-                    onCheckedChange={(checked) => setRefundChecked(Boolean(checked))}
-                    className="mt-0.5"
-                  />
-                  <div className="flex-1">
-                    <label
-                      htmlFor={`refund-policy-${product.id}`}
-                      className="block text-sm font-medium leading-6"
-                    >
-                      Saya sudah baca Refund Policy
-                    </label>
-                    <Button
-                      asChild
-                      variant="link"
-                      className="mt-1 h-auto justify-start p-0 text-sm text-blue-700 hover:text-blue-600"
-                    >
-                      <Link href="#refund-policy">Buka Refund Policy</Link>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
+            </div>
           </div>
         ) : (
           <div className="mb-4 rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
