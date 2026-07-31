@@ -90,7 +90,7 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
   },
   admin: {
     ...defaultCollection?.admin,
-    defaultColumns: ['title', 'enableVariants', '_status', 'variants.variants'],
+    defaultColumns: ['title', 'enableVariants', '_status', 'duplicateAction', 'variants.variants'],
     livePreview: {
       url: ({ data, req }) =>
         generatePreviewPath({
@@ -129,6 +129,15 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
     meta: true,
   },
   fields: [
+    {
+      name: 'duplicateAction',
+      type: 'ui',
+      admin: {
+        components: {
+          Cell: '@/collections/Products/DuplicateProductCell#DuplicateProductCell',
+        },
+      },
+    },
     { name: 'title', type: 'text', required: true },
     {
       name: 'shortDescription',

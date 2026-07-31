@@ -173,6 +173,16 @@ export const DigitalStockUnits: CollectionConfig = {
       },
     },
     {
+      name: 'manualOrderAction',
+      type: 'ui',
+      admin: {
+        components: {
+          Field: '@/collections/DigitalStockUnits/ManualOrderField#ManualOrderField',
+        },
+        position: 'sidebar',
+      },
+    },
+    {
       name: 'notes',
       type: 'textarea',
     },

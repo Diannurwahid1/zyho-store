@@ -10,6 +10,10 @@ export const sendPaymentTransactionWhatsAppAfterChange: CollectionAfterChangeHoo
   previousDoc,
   req,
 }) => {
+  if (req?.context?.skipPaymentTransactionNotifications) {
+    return doc
+  }
+
   const currentStatus = doc.status
   const previousStatus = previousDoc?.status
 

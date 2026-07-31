@@ -417,7 +417,7 @@ export async function addStock(
     productId: string | number
     variantId?: string | null
     quantity: number
-    type?: 'in' | 'adjust'
+    type?: 'in' | 'adjust' | 'out'
     referenceId?: string | null
     performedById?: string | number | null
     notes?: string | null
@@ -452,7 +452,7 @@ export async function addStock(
         stockAfter: newInventory,
         referenceId,
         performedById,
-        notes: notes || (type === 'in' ? 'Restock' : 'Penyesuaian manual'),
+        notes: notes || (type === 'in' ? 'Restock' : type === 'out' ? 'Stok keluar' : 'Penyesuaian manual'),
         costPerUnit,
       })
       return { success: true, newInventory }
@@ -482,7 +482,7 @@ export async function addStock(
       stockAfter: newInventory,
       referenceId,
       performedById,
-      notes: notes || (type === 'in' ? 'Restock' : 'Penyesuaian manual'),
+      notes: notes || (type === 'in' ? 'Restock' : type === 'out' ? 'Stok keluar' : 'Penyesuaian manual'),
       costPerUnit,
     })
     return { success: true, newInventory }

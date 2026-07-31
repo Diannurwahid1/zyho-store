@@ -13,9 +13,15 @@ import React, { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 type Props = {
   product: Product
+  externallyDisabled?: boolean
+  disabledLabel?: string
 }
 
-export function AddToCart({ product }: Props) {
+export function AddToCart({
+  product,
+  externallyDisabled = false,
+  disabledLabel = 'Checklist policy dulu',
+}: Props) {
   const { addItem, cart, isLoading } = useCart()
   const { currency } = useCurrency()
   const { hasActiveCheckout, isChecking: isCheckingCheckout } = useActiveCheckout()
@@ -88,6 +94,10 @@ export function AddToCart({ product }: Props) {
   )
 
   const disabled = useMemo<boolean>(() => {
+    if (externallyDisabled) {
+      return true
+    }
+
     // Disable jika ada active checkout session
     if (hasActiveCheckout) {
       return true
@@ -141,7 +151,7 @@ export function AddToCart({ product }: Props) {
     }
 
     return false
-  }, [selectedVariant, cart?.items, product, availableStock, hasActiveCheckout])
+  }, [selectedVariant, cart?.items, product, availableStock, hasActiveCheckout, externallyDisabled])
 
   const isOutOfStock = useMemo<boolean>(() => {
     if (availableStock !== null) {
@@ -190,6 +200,8 @@ export function AddToCart({ product }: Props) {
         ? 'Checking...'
         : hasActiveCheckout
           ? 'Checkout Aktif'
+          : externallyDisabled
+            ? disabledLabel
           : isCheckingStock
             ? 'Checking Stock...'
             : 'Add To Cart'}

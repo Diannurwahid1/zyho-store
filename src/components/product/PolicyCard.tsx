@@ -7,9 +7,10 @@ type Props = {
   title: string
   content: string
   maxLength?: number
+  id?: string
 }
 
-export function PolicyCard({ title, content, maxLength = 100 }: Props) {
+export function PolicyCard({ title, content, maxLength = 100, id }: Props) {
   const [isExpanded, setIsExpanded] = useState(false)
 
   if (!content) return null
@@ -18,7 +19,7 @@ export function PolicyCard({ title, content, maxLength = 100 }: Props) {
   const displayContent = isExpanded || !shouldTruncate ? content : `${content.substring(0, maxLength)}...`
 
   return (
-    <div className="rounded-3xl border bg-background p-6">
+    <div id={id} className="scroll-mt-24 rounded-3xl border bg-background p-6">
       <p className="text-sm text-muted-foreground">{title}</p>
       <p className="mt-2 font-semibold whitespace-pre-wrap">{displayContent}</p>
       {shouldTruncate && (

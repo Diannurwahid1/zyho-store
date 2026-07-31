@@ -1,6 +1,7 @@
 import { awardSignupVoucherForUser } from '@/lib/signupVoucherCampaign'
 
 export const awardSignupVoucherCampaignAfterChange = async ({ doc, operation, req }: any) => {
+  if (req?.context?.skipSignupVoucherCampaign) return
   if (operation !== 'create' || !doc?.id) return
 
   try {

@@ -5,9 +5,12 @@ import { AddToCart } from '@/components/Cart/AddToCart'
 import { DiscountedPrice } from '@/components/DiscountedPrice'
 import { Price } from '@/components/Price'
 import { RichText } from '@/components/RichText'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { gaViewItem } from '@/utilities/googleAnalytics'
 import { getProductBadgeLabel } from '@/utilities/productBadge'
-import { Suspense, useEffect } from 'react'
+import Link from 'next/link'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 
 import { StockIndicator } from '@/components/product/StockIndicator'
 import { useCurrency } from '@payloadcms/plugin-ecommerce/client/react'
@@ -16,6 +19,11 @@ import { VariantSelector } from './VariantSelector'
 export function ProductDescription({ product }: { product: Product }) {
   const { currency } = useCurrency()
   const badgeLabel = getProductBadgeLabel(product as any)
+  const hasUpdatePolicy = Boolean(product.updatePolicy?.trim())
+  const hasRefundPolicy = Boolean(product.refundPolicy?.trim())
+  const requiresPolicyConsent = hasUpdatePolicy || hasRefundPolicy
+  const [updateChecked, setUpdateChecked] = useState(!hasUpdatePolicy)
+  const [refundChecked, setRefundChecked] = useState(!hasRefundPolicy)
   let amount = 0,
     lowestAmount = 0,
     highestAmount = 0
@@ -61,6 +69,16 @@ export function ProductDescription({ product }: { product: Product }) {
       product,
     })
   }, [currency.code, product])
+
+  useEffect(() => {
+    setUpdateChecked(!hasUpdatePolicy)
+    setRefundChecked(!hasRefundPolicy)
+  }, [hasRefundPolicy, hasUpdatePolicy, product.id])
+
+  const policyConsentComplete = useMemo(() => {
+    if (!requiresPolicyConsent) return true
+    return updateChecked && refundChecked
+  }, [refundChecked, requiresPolicyConsent, updateChecked])
 
   return (
     <div className="flex flex-col gap-6">
@@ -112,8 +130,83 @@ export function ProductDescription({ product }: { product: Product }) {
       </div>
 
       <div className="rounded-2xl border bg-background p-4">
+        {requiresPolicyConsent ? (
+          <div className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+            <div className="flex flex-col gap-3">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-500">
+                  Wajib dicek dulu
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Sebelum tambah ke keranjang, buka policy di bawah lalu centang persetujuannya.
+                </p>
+              </div>
+
+              {hasUpdatePolicy ? (
+                <div className="rounded-2xl border border-border/70 bg-background/70 p-3">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id={`update-policy-${product.id}`}
+                      checked={updateChecked}
+                      onCheckedChange={(checked) => setUpdateChecked(Boolean(checked))}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1">
+                      <label
+                        htmlFor={`update-policy-${product.id}`}
+                        className="text-sm font-medium leading-6"
+                      >
+                        Saya sudah baca Update Policy
+                      </label>
+                      <Button
+                        asChild
+                        variant="link"
+                        className="mt-1 h-auto justify-start p-0 text-sm text-amber-500"
+                      >
+                        <Link href="#update-policy">Lihat card Update Policy</Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {hasRefundPolicy ? (
+                <div className="rounded-2xl border border-border/70 bg-background/70 p-3">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id={`refund-policy-${product.id}`}
+                      checked={refundChecked}
+                      onCheckedChange={(checked) => setRefundChecked(Boolean(checked))}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1">
+                      <label
+                        htmlFor={`refund-policy-${product.id}`}
+                        className="text-sm font-medium leading-6"
+                      >
+                        Saya sudah baca Refund Policy
+                      </label>
+                      <Button
+                        asChild
+                        variant="link"
+                        className="mt-1 h-auto justify-start p-0 text-sm text-amber-500"
+                      >
+                        <Link href="#refund-policy">Lihat card Refund Policy</Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         <Suspense fallback={null}>
-          <AddToCart product={product} />
+          <AddToCart
+            product={product}
+            externallyDisabled={!policyConsentComplete}
+            disabledLabel="Centang policy dulu"
+          />
         </Suspense>
       </div>
 

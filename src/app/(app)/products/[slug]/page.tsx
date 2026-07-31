@@ -176,10 +176,10 @@ export default async function ProductPage({ params }: Args) {
             <p className="mt-2 font-semibold">{product.version || '1.0.0'}</p>
           </div>
           {product.updatePolicy && (
-            <PolicyCard title="Update Policy" content={product.updatePolicy} />
+            <PolicyCard id="update-policy" title="Update Policy" content={product.updatePolicy} />
           )}
           {product.refundPolicy && (
-            <PolicyCard title="Refund Policy" content={product.refundPolicy} />
+            <PolicyCard id="refund-policy" title="Refund Policy" content={product.refundPolicy} />
           )}
         </div>
       </div>
