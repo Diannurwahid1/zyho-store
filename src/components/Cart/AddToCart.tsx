@@ -8,8 +8,8 @@ import { WaitlistDialog } from '@/components/WaitlistDialog'
 import { useActiveCheckout } from '@/hooks/useActiveCheckout'
 import { useCart, useCurrency } from '@payloadcms/plugin-ecommerce/client/react'
 import clsx from 'clsx'
-import { useSearchParams } from 'next/navigation'
-import React, { useCallback, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import React, { useCallback, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 type Props = {
   product: Product
@@ -25,7 +25,9 @@ export function AddToCart({
   const { addItem, cart, isLoading } = useCart()
   const { currency } = useCurrency()
   const { hasActiveCheckout, isChecking: isCheckingCheckout } = useActiveCheckout()
+  const router = useRouter()
   const searchParams = useSearchParams()
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const variants = product.variants?.docs || []
 
@@ -73,37 +75,8 @@ export function AddToCart({
       .finally(() => setIsCheckingStock(false))
   }, [product.id, selectedVariant?.id])
 
-  const addToCart = useCallback(
-    (e: React.FormEvent<HTMLButtonElement>) => {
-      e.preventDefault()
-
-      addItem({
-        product: product.id,
-        variant: selectedVariant?.id ?? undefined,
-      }).then(() => {
-        gaAddToCart({
-          currency: currency.code,
-          product,
-          quantity: 1,
-          variant: selectedVariant,
-        })
-        toast.success('Item added to cart.')
-      })
-    },
-    [addItem, currency.code, product, selectedVariant],
-  )
-
-  const disabled = useMemo<boolean>(() => {
-    if (externallyDisabled) {
-      return true
-    }
-
-    // Disable jika ada active checkout session
-    if (hasActiveCheckout) {
-      return true
-    }
-
-    const existingItem = cart?.items?.find((item) => {
+  const existingItem = useMemo(() => {
+    return cart?.items?.find((item) => {
       const productID = typeof item.product === 'object' ? item.product?.id : item.product
       const variantID = item.variant
         ? typeof item.variant === 'object'
@@ -111,13 +84,20 @@ export function AddToCart({
           : item.variant
         : undefined
 
-      if (productID === product.id) {
-        if (product.enableVariants) {
-          return variantID === selectedVariant?.id
-        }
-        return true
-      }
+      if (productID !== product.id) return false
+      if (product.enableVariants) return variantID === selectedVariant?.id
+      return true
     })
+  }, [cart?.items, product.enableVariants, product.id, selectedVariant?.id])
+
+  const disabled = useMemo<boolean>(() => {
+    if (externallyDisabled) {
+      return true
+    }
+
+    if (hasActiveCheckout) {
+      return true
+    }
 
     if (existingItem) {
       const existingQuantity = existingItem.quantity
@@ -144,14 +124,94 @@ export function AddToCart({
       if (selectedVariant.inventory === 0) {
         return true
       }
-    } else {
-      if (product.inventory === 0) {
-        return true
-      }
+    } else if (product.inventory === 0) {
+      return true
     }
 
     return false
-  }, [selectedVariant, cart?.items, product, availableStock, hasActiveCheckout, externallyDisabled])
+  }, [
+    availableStock,
+    existingItem,
+    externallyDisabled,
+    hasActiveCheckout,
+    product.enableVariants,
+    product.inventory,
+    selectedVariant,
+  ])
+
+  const addSelectedItem = useCallback(() => {
+    return addItem({
+      product: product.id,
+      variant: selectedVariant?.id ?? undefined,
+    }).then(() => {
+      gaAddToCart({
+        currency: currency.code,
+        product,
+        quantity: 1,
+        variant: selectedVariant,
+      })
+    })
+  }, [addItem, currency.code, product, selectedVariant])
+
+  const addToCart = useCallback(
+    async (e: React.FormEvent<HTMLButtonElement>) => {
+      e.preventDefault()
+      if (disabled || isSubmitting) return
+
+      setIsSubmitting(true)
+      try {
+        await addSelectedItem()
+        toast.success('Item added to cart.')
+      } finally {
+        setIsSubmitting(false)
+      }
+    },
+    [addSelectedItem, disabled, isSubmitting],
+  )
+
+  const handleBuyNow = useCallback(
+    async (e: React.FormEvent<HTMLButtonElement>) => {
+      e.preventDefault()
+      if (disabled || isSubmitting) return
+
+      setIsSubmitting(true)
+      try {
+        const sessionResponse = await fetch('/api/checkout/session', {
+          cache: 'no-store',
+          credentials: 'include',
+        })
+
+        if (sessionResponse.ok) {
+          const { session } = await sessionResponse.json()
+          if (session) {
+            toast.info('Selesaikan pembayaran yang aktif sebelum membuat checkout baru.')
+            router.push('/checkout')
+            return
+          }
+        }
+
+        await addSelectedItem()
+        toast.success('Mengarahkan ke checkout...')
+
+        const previousQuantity = existingItem?.quantity ?? 0
+        const params = new URLSearchParams({
+          buyNow: '1',
+          previousQuantity: String(previousQuantity),
+          productId: String(product.id),
+          quantity: '1',
+        })
+
+        if (selectedVariant?.id) {
+          params.set('variantId', String(selectedVariant.id))
+        }
+
+        router.push(`/checkout?${params.toString()}`)
+      } finally {
+        setIsSubmitting(false)
+      }
+    },
+    [addSelectedItem, disabled, existingItem?.quantity, isSubmitting, product.id, router, selectedVariant?.id],
+  )
 
   const isOutOfStock = useMemo<boolean>(() => {
     if (availableStock !== null) {
@@ -185,26 +245,52 @@ export function AddToCart({
   }
 
   return (
-    <Button
-      aria-label="Add to cart"
-      variant={'outline'}
-      className={clsx({
-        'hover:opacity-90': true,
-        'opacity-60 cursor-not-allowed': disabled || isLoading || isCheckingCheckout || isCheckingStock,
-      })}
-      disabled={disabled || isLoading || isCheckingCheckout || isCheckingStock}
-      onClick={addToCart}
-      type="submit"
-    >
-      {isCheckingCheckout
-        ? 'Checking...'
-        : hasActiveCheckout
-          ? 'Checkout Aktif'
-          : externallyDisabled
-            ? disabledLabel
-          : isCheckingStock
-            ? 'Checking Stock...'
-            : 'Add To Cart'}
-    </Button>
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <Button
+        aria-label="Buy now"
+        className={clsx({
+          'opacity-60 cursor-not-allowed': disabled || isLoading || isCheckingCheckout || isCheckingStock || isSubmitting,
+        })}
+        disabled={disabled || isLoading || isCheckingCheckout || isCheckingStock || isSubmitting}
+        onClick={handleBuyNow}
+        type="button"
+      >
+        {isCheckingCheckout
+          ? 'Checking...'
+          : hasActiveCheckout
+            ? 'Checkout Aktif'
+            : externallyDisabled
+              ? disabledLabel
+              : isCheckingStock
+                ? 'Checking Stock...'
+                : isSubmitting
+                  ? 'Memproses...'
+                  : 'Beli Sekarang'}
+      </Button>
+
+      <Button
+        aria-label="Add to cart"
+        variant={'outline'}
+        className={clsx({
+          'hover:opacity-90': true,
+          'opacity-60 cursor-not-allowed': disabled || isLoading || isCheckingCheckout || isCheckingStock || isSubmitting,
+        })}
+        disabled={disabled || isLoading || isCheckingCheckout || isCheckingStock || isSubmitting}
+        onClick={addToCart}
+        type="button"
+      >
+        {isCheckingCheckout
+          ? 'Checking...'
+          : hasActiveCheckout
+            ? 'Checkout Aktif'
+            : externallyDisabled
+              ? disabledLabel
+              : isCheckingStock
+                ? 'Checking Stock...'
+                : isSubmitting
+                  ? 'Memproses...'
+                  : 'Add To Cart'}
+      </Button>
+    </div>
   )
 }

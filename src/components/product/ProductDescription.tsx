@@ -19,8 +19,12 @@ import { VariantSelector } from './VariantSelector'
 export function ProductDescription({ product }: { product: Product }) {
   const { currency } = useCurrency()
   const badgeLabel = getProductBadgeLabel(product as any)
-  const hasUpdatePolicy = Boolean(product.updatePolicy?.trim())
-  const hasRefundPolicy = Boolean(product.refundPolicy?.trim())
+  const normalizedUpdatePolicy =
+    typeof product.updatePolicy === 'string' ? product.updatePolicy.trim() : ''
+  const normalizedRefundPolicy =
+    typeof product.refundPolicy === 'string' ? product.refundPolicy.trim() : ''
+  const hasUpdatePolicy = normalizedUpdatePolicy.length > 0
+  const hasRefundPolicy = normalizedRefundPolicy.length > 0
   const requiresPolicyConsent = hasUpdatePolicy || hasRefundPolicy
   const [updateChecked, setUpdateChecked] = useState(!hasUpdatePolicy)
   const [refundChecked, setRefundChecked] = useState(!hasRefundPolicy)
@@ -135,15 +139,15 @@ export function ProductDescription({ product }: { product: Product }) {
             <div className="flex flex-col gap-3">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-500">
-                  Wajib dicek dulu
+                  Checklist policy
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Sebelum tambah ke keranjang, buka policy di bawah lalu centang persetujuannya.
+                  Bagian ini wajib dicentang sebelum `Beli Sekarang` atau `Add To Cart`.
                 </p>
               </div>
 
               {hasUpdatePolicy ? (
-                <div className="rounded-2xl border border-border/70 bg-background/70 p-3">
+                <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
                   <div className="flex items-start gap-3">
                     <Checkbox
                       id={`update-policy-${product.id}`}
@@ -154,7 +158,7 @@ export function ProductDescription({ product }: { product: Product }) {
                     <div className="flex-1">
                       <label
                         htmlFor={`update-policy-${product.id}`}
-                        className="text-sm font-medium leading-6"
+                        className="block text-sm font-medium leading-6"
                       >
                         Saya sudah baca Update Policy
                       </label>
@@ -163,7 +167,7 @@ export function ProductDescription({ product }: { product: Product }) {
                         variant="link"
                         className="mt-1 h-auto justify-start p-0 text-sm text-amber-500"
                       >
-                        <Link href="#update-policy">Lihat card Update Policy</Link>
+                        <Link href="#update-policy">Buka Update Policy</Link>
                       </Button>
                     </div>
                   </div>
@@ -171,7 +175,7 @@ export function ProductDescription({ product }: { product: Product }) {
               ) : null}
 
               {hasRefundPolicy ? (
-                <div className="rounded-2xl border border-border/70 bg-background/70 p-3">
+                <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
                   <div className="flex items-start gap-3">
                     <Checkbox
                       id={`refund-policy-${product.id}`}
@@ -182,7 +186,7 @@ export function ProductDescription({ product }: { product: Product }) {
                     <div className="flex-1">
                       <label
                         htmlFor={`refund-policy-${product.id}`}
-                        className="text-sm font-medium leading-6"
+                        className="block text-sm font-medium leading-6"
                       >
                         Saya sudah baca Refund Policy
                       </label>
@@ -191,7 +195,7 @@ export function ProductDescription({ product }: { product: Product }) {
                         variant="link"
                         className="mt-1 h-auto justify-start p-0 text-sm text-amber-500"
                       >
-                        <Link href="#refund-policy">Lihat card Refund Policy</Link>
+                        <Link href="#refund-policy">Buka Refund Policy</Link>
                       </Button>
                     </div>
                   </div>
@@ -199,7 +203,11 @@ export function ProductDescription({ product }: { product: Product }) {
               ) : null}
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="mb-4 rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
+            Produk ini belum punya `Update Policy` atau `Refund Policy`, jadi checklist policy tidak diperlukan.
+          </div>
+        )}
 
         <Suspense fallback={null}>
           <AddToCart
