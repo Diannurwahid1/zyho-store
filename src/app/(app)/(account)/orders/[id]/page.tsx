@@ -2,6 +2,7 @@ import type { Media, Order } from '@/payload-types'
 import type { Metadata } from 'next'
 
 import { AddressItem } from '@/components/addresses/AddressItem'
+import { DeliveryUnitCard } from '@/components/orders/DeliveryUnitCard'
 import { OrderStatus } from '@/components/OrderStatus'
 import { Price } from '@/components/Price'
 import { ProductItem } from '@/components/ProductItem'
@@ -167,7 +168,7 @@ export default async function Order({ params, searchParams }: PageProps) {
         </h1>
       </div>
 
-      <div className="bg-card border rounded-lg px-6 py-4 flex flex-col gap-12">
+      <div className="flex flex-col gap-8 rounded-lg border bg-card px-4 py-4 sm:px-6 sm:py-4 md:gap-12">
         <div className="flex flex-col gap-6 lg:flex-row lg:justify-between">
           <div className="">
             <p className="font-mono uppercase text-primary/50 mb-1 text-sm">Order Date</p>
@@ -248,84 +249,35 @@ export default async function Order({ params, searchParams }: PageProps) {
           (order as any).digitalDeliveries.length > 0 && (
             <div>
               <h2 className="mb-4 font-mono text-sm uppercase text-primary/50">Digital Delivery</h2>
+              <div className="mb-4 rounded-xl border border-border/60 bg-background/50 p-3 text-sm text-muted-foreground">
+                Detail produk digital ini juga sudah dikirim ke email kamu. Kalau belum ada di inbox,
+                cek folder spam atau promotions.
+              </div>
 
               <div className="space-y-4">
                 {(order as any).digitalDeliveries.map((delivery: any, deliveryIndex: number) => (
                   <div
                     key={`${delivery.productTitle || delivery.product}-${deliveryIndex}`}
-                    className="rounded-xl border bg-background/40 p-4"
+                    className="rounded-xl border bg-background/40 p-3 sm:p-4"
                   >
                     <div className="mb-3">
-                      <p className="text-lg font-semibold">
+                      <p className="break-words text-base font-semibold sm:text-lg">
                         {delivery.productTitle || 'Digital Product'}
                       </p>
                       {delivery.variantTitle && (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="break-words text-sm text-muted-foreground">
                           Variant: {delivery.variantTitle}
                         </p>
                       )}
                     </div>
 
                     <div className="space-y-3">
-                      {(delivery.units || []).map((unit: any, unitIndex: number) => {
-                        const file =
-                          unit.file && typeof unit.file === 'object' ? (unit.file as Media) : null
-
-                        return (
-                          <div
-                            key={`${unit.unitCode || 'unit'}-${unitIndex}`}
-                            className="rounded-lg border border-border/60 bg-card p-4"
-                          >
-                            <div className="mb-2 flex flex-wrap items-center gap-2">
-                              <span className="rounded-full bg-primary/10 px-2 py-1 font-mono text-xs uppercase tracking-[0.16em]">
-                                {unit.deliveryType || 'credentials'}
-                              </span>
-                              {unit.unitCode && (
-                                <span className="font-mono text-xs text-muted-foreground">
-                                  {unit.unitCode}
-                                </span>
-                              )}
-                            </div>
-
-                            {unit.label && <p className="font-medium">{unit.label}</p>}
-                            {unit.accountEmail && <p>Email: {unit.accountEmail}</p>}
-                            {unit.accountUsername && <p>Username: {unit.accountUsername}</p>}
-                            {unit.accountPassword && <p>Password: {unit.accountPassword}</p>}
-                            {unit.loginUrl && (
-                              <p>
-                                Login URL:{' '}
-                                <a
-                                  href={unit.loginUrl}
-                                  className="underline"
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  {unit.loginUrl}
-                                </a>
-                              </p>
-                            )}
-                            {unit.referenceCode && <p>Reference: {unit.referenceCode}</p>}
-                            {unit.content && (
-                              <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                                {unit.content}
-                              </p>
-                            )}
-                            {file?.url && (
-                              <p>
-                                File:{' '}
-                                <a
-                                  href={file.url}
-                                  className="underline"
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  {file.filename || 'Download file'}
-                                </a>
-                              </p>
-                            )}
-                          </div>
-                        )
-                      })}
+                      {(delivery.units || []).map((unit: any, unitIndex: number) => (
+                        <DeliveryUnitCard
+                          key={`${unit.unitCode || 'unit'}-${unitIndex}`}
+                          unit={unit}
+                        />
+                      ))}
                     </div>
                   </div>
                 ))}
