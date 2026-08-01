@@ -18,6 +18,8 @@ type VerifiedGoogleUserInfo = {
   sub: string
 }
 
+type UserRole = NonNullable<NonNullable<User['roles']>[number]>
+
 const GOOGLE_STATE_COOKIE = 'google-oauth-state'
 const USERS_SLUG = 'users'
 
@@ -244,6 +246,13 @@ export const loginOrCreateGoogleCustomer = async (code: string) => {
     },
   })
 
+  const existingRoles = Array.isArray(existingUser?.roles)
+    ? existingUser.roles.filter((role): role is UserRole => Boolean(role))
+    : []
+  const mergedRoles: UserRole[] = Array.from(
+    new Set<UserRole>([...(existingRoles.length ? existingRoles : []), 'customer']),
+  )
+
   const userData = {
     email: profile.email.toLowerCase(),
     googleAvatarURL: profile.picture,
@@ -251,7 +260,7 @@ export const loginOrCreateGoogleCustomer = async (code: string) => {
     memberTier: 'bronze' as const,
     memberSince: existingUser?.memberSince || new Date().toISOString(),
     name: profile.name || profile.email.split('@')[0],
-    roles: ['customer' as const],
+    roles: mergedRoles,
     totalSpentIDR: existingUser?.totalSpentIDR || 0,
   }
 
