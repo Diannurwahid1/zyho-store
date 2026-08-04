@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 import { cn } from '@/utilities/cn'
 
-const WHATSAPP_ADMIN_URL = 'https://wa.me/6289514094736'
+const WHATSAPP_ADMIN_URL = 'https://wa.me/62895110050207'
 
 const WhatsAppIcon = ({ className }: { className?: string }) => (
   <svg
@@ -70,7 +70,7 @@ export function WhatsAppSupportCard({
 
         <div className="flex flex-col items-start gap-3 md:items-end">
           <div className="rounded-full border border-white/10 bg-black/10 px-3 py-1.5 font-mono text-xs tracking-[0.18em] text-foreground/70">
-            wa.me/6289514094736
+            wa.me/62895110050207
           </div>
           <Link
             className={cn(
