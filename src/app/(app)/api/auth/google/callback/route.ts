@@ -3,6 +3,8 @@ import {
   isGoogleAuthEnabled,
   loginOrCreateGoogleCustomer,
   parseGoogleOAuthState,
+  parseGoogleStateCookie,
+  serializeGoogleStateCookie,
 } from '@/utilities/googleAuth'
 import { getServerSideURL } from '@/utilities/getURL'
 import { NextRequest, NextResponse } from 'next/server'
@@ -25,13 +27,19 @@ export async function GET(req: NextRequest) {
 
   const code = req.nextUrl.searchParams.get('code')
   const state = parseGoogleOAuthState(req.nextUrl.searchParams.get('state'))
-  const cookieNonce = req.cookies.get(getGoogleStateCookieName())?.value
+  const cookieNonces = parseGoogleStateCookie(req.cookies.get(getGoogleStateCookieName())?.value)
+  const hasMatchingNonce = Boolean(state?.nonce && cookieNonces.includes(state.nonce))
 
-  if (!code || !state || !cookieNonce || cookieNonce !== state.nonce) {
+  if (!code || !state || !hasMatchingNonce) {
     auditLog({
       level: 'warn',
       message: '[Security] Google auth callback validation failed',
-      meta: buildAuditMeta(req, { hasCode: Boolean(code), hasState: Boolean(state) }),
+      meta: buildAuditMeta(req, {
+        hasCode: Boolean(code),
+        hasMatchingNonce,
+        hasState: Boolean(state),
+        pendingNonceCount: cookieNonces.length,
+      }),
     })
     return NextResponse.redirect(fallbackURL)
   }
@@ -55,7 +63,18 @@ export async function GET(req: NextRequest) {
       sameSite: cookie.sameSite?.toLowerCase() as 'lax' | 'strict' | 'none' | undefined,
       secure: cookie.secure,
     })
-    response.cookies.delete(getGoogleStateCookieName())
+    const remainingNonces = cookieNonces.filter((nonce) => nonce !== state.nonce)
+    if (remainingNonces.length > 0) {
+      response.cookies.set(getGoogleStateCookieName(), serializeGoogleStateCookie(remainingNonces), {
+        httpOnly: true,
+        maxAge: 600,
+        path: '/',
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      })
+    } else {
+      response.cookies.delete(getGoogleStateCookieName())
+    }
 
     auditLog({
       message: '[Audit] Google auth callback completed',

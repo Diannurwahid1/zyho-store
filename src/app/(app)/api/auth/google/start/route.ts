@@ -3,6 +3,8 @@ import {
   getGoogleStateCookieName,
   isGoogleAuthEnabled,
   normalizeRedirectPath,
+  parseGoogleStateCookie,
+  serializeGoogleStateCookie,
 } from '@/utilities/googleAuth'
 import { auditLog, buildAuditMeta, enforceRateLimit } from '@/utilities/security'
 import { NextRequest, NextResponse } from 'next/server'
@@ -23,8 +25,9 @@ export async function GET(req: NextRequest) {
   const redirect = normalizeRedirectPath(req.nextUrl.searchParams.get('redirect'))
   const { nonce, url } = buildGoogleAuthorizationURL(redirect)
   const response = NextResponse.redirect(url)
+  const existingNonces = parseGoogleStateCookie(req.cookies.get(getGoogleStateCookieName())?.value)
 
-  response.cookies.set(getGoogleStateCookieName(), nonce, {
+  response.cookies.set(getGoogleStateCookieName(), serializeGoogleStateCookie([...existingNonces, nonce]), {
     httpOnly: true,
     maxAge: 600,
     path: '/',

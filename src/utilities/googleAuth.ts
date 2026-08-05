@@ -22,8 +22,31 @@ type UserRole = NonNullable<NonNullable<User['roles']>[number]>
 
 const GOOGLE_STATE_COOKIE = 'google-oauth-state'
 const USERS_SLUG = 'users'
+const MAX_PENDING_GOOGLE_NONCES = 8
 
 export const getGoogleStateCookieName = () => GOOGLE_STATE_COOKIE
+
+export const parseGoogleStateCookie = (value?: null | string) => {
+  if (!value) return []
+
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!Array.isArray(parsed)) return []
+
+    return parsed
+      .filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+      .slice(-MAX_PENDING_GOOGLE_NONCES)
+  } catch {
+    return value ? [value] : []
+  }
+}
+
+export const serializeGoogleStateCookie = (nonces: string[]) =>
+  JSON.stringify(
+    Array.from(new Set(nonces.filter((nonce) => typeof nonce === 'string' && nonce.length > 0))).slice(
+      -MAX_PENDING_GOOGLE_NONCES,
+    ),
+  )
 
 export const isGoogleAuthEnabled = () =>
   Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
