@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton'
+import { RedeemGiftCard } from '@/components/account/RedeemGiftCard'
 import { MemberTierShowcase } from '@/components/member/MemberTierShowcase'
 import { Button } from '@/components/ui/button'
 import {
@@ -157,6 +158,8 @@ export default async function AccountPage() {
           </div>
         )}
       </section>
+
+      <RedeemGiftCard />
     </div>
   )
 }

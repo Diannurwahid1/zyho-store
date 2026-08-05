@@ -11,6 +11,7 @@ type Props = {
 
 export const OrderItem: React.FC<Props> = ({ order }) => {
   const itemsLabel = order.items?.length === 1 ? 'Item' : 'Items'
+  const orderChannel = (order as any).orderChannel
 
   return (
     <div className="bg-card border rounded-lg px-4 py-2 md:px-6 md:py-4 flex flex-col sm:flex-row gap-12 sm:items-center sm:justify-between">
@@ -24,7 +25,13 @@ export const OrderItem: React.FC<Props> = ({ order }) => {
             </time>
           </p>
 
-          {order.status && <OrderStatus status={order.status} />}
+          {orderChannel === 'gift_redeem' ? (
+            <div className="w-fit rounded bg-amber-500/15 px-2 py-0 text-xs font-mono uppercase tracking-widest text-amber-500">
+              gift redeem
+            </div>
+          ) : (
+            order.status && <OrderStatus status={order.status} />
+          )}
         </div>
 
         <p className="flex gap-2 text-xs text-primary/80">

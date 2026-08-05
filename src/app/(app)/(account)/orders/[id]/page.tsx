@@ -55,19 +55,20 @@ export default async function Order({ params, searchParams }: PageProps) {
           equals: id,
         },
       },
-      select: {
-        accessToken: true,
-        amount: true,
-        currency: true,
-        items: true,
-        customerEmail: true,
-        customer: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-        shippingAddress: true,
-        digitalDeliveries: true,
-      },
+        select: {
+          accessToken: true,
+          amount: true,
+          currency: true,
+          items: true,
+          customerEmail: true,
+          customer: true,
+          status: true,
+          orderChannel: true,
+          createdAt: true,
+          updatedAt: true,
+          shippingAddress: true,
+          digitalDeliveries: true,
+        },
     })
 
     if (orderResult) {
@@ -146,6 +147,7 @@ export default async function Order({ params, searchParams }: PageProps) {
 
   const hasCaraPenggunaan = productGuides.some((p) => p.caraPenggunaan)
   const hasGaransi = productGuides.some((p) => p.garansi)
+  const orderChannel = (order as any).orderChannel
 
   return (
     <div className="">
@@ -190,10 +192,16 @@ export default async function Order({ params, searchParams }: PageProps) {
             )}
           </div>
 
-          {order.status && (
+          {(order.status || orderChannel) && (
             <div className="grow max-w-1/3">
               <p className="font-mono uppercase text-primary/50 mb-1 text-sm">Status</p>
-              <OrderStatus className="text-sm" status={order.status} />
+              {orderChannel === 'gift_redeem' ? (
+                <div className="w-fit rounded bg-amber-500/15 px-2 py-1 text-xs font-mono uppercase tracking-widest text-amber-500">
+                  gift redeem
+                </div>
+              ) : (
+                order.status && <OrderStatus className="text-sm" status={order.status} />
+              )}
             </div>
           )}
         </div>

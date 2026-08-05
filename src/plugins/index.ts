@@ -208,6 +208,15 @@ export const plugins: Plugin[] = [
             options: ['bronze', 'silver', 'gold', 'diamond'],
           },
           {
+            name: 'orderChannel',
+            type: 'text',
+            defaultValue: 'checkout',
+            admin: {
+              position: 'sidebar',
+              readOnly: true,
+            },
+          },
+          {
             name: 'digitalDeliveries',
             type: 'array',
             admin: {
