@@ -1,7 +1,9 @@
 'use client'
 
+import { DiscountedPrice } from '@/components/DiscountedPrice'
 import { LocalizedPrice } from '@/components/LocalizedPrice'
 import { Price } from '@/components/Price'
+import { useActiveVouchers } from '@/providers/ActiveVouchers'
 import {
     Sheet,
     SheetContent,
@@ -28,6 +30,7 @@ type StockMap = Record<string, number> // key: `${productId}:${variantId|'base'}
 
 export function CartModal({ trigger }: { trigger?: React.ReactNode }) {
   const { cart } = useCart()
+  const { getProductDiscount } = useActiveVouchers()
   const [isOpen, setIsOpen] = useState(false)
   const [stockMap, setStockMap] = useState<StockMap>({})
   const [checkingStock, setCheckingStock] = useState(false)
@@ -92,6 +95,58 @@ export function CartModal({ trigger }: { trigger?: React.ReactNode }) {
       return (stockMap[key] ?? 1) <= 0
     })
   }, [cart?.items, stockMap])
+
+  const pricingSummary = useMemo(() => {
+    if (!cart?.items?.length) {
+      return {
+        discountTotal: 0,
+        subtotal: 0,
+        total: 0,
+      }
+    }
+
+    let subtotal = 0
+    let total = 0
+
+    for (const item of cart.items) {
+      if (typeof item.product !== 'object' || !item.product) continue
+
+      const product = item.product as Product
+      const variant = item.variant && typeof item.variant === 'object' ? item.variant : null
+      const quantity = Math.max(0, item.quantity || 0)
+
+      if (!quantity) continue
+
+      const productId = product.id
+      const basePriceInUSD = variant?.priceInUSD ?? product.priceInUSD
+      const basePriceInIDR = variant?.priceInIDR ?? product.priceInIDR
+      const discount = getProductDiscount(productId)
+      const baseUnitPrice =
+        typeof basePriceInIDR === 'number'
+          ? basePriceInIDR
+          : typeof basePriceInUSD === 'number'
+            ? basePriceInUSD
+            : 0
+
+      let discountedUnitPrice = baseUnitPrice
+
+      if (discount && baseUnitPrice > 0) {
+        discountedUnitPrice =
+          discount.discountType === 'percentage'
+            ? Math.max(0, baseUnitPrice * (1 - discount.amount / 100))
+            : Math.max(0, baseUnitPrice - discount.amount)
+      }
+
+      subtotal += baseUnitPrice * quantity
+      total += discountedUnitPrice * quantity
+    }
+
+    return {
+      discountTotal: Math.max(0, subtotal - total),
+      subtotal,
+      total,
+    }
+  }, [cart?.items, getProductDiscount])
 
   return (
     <Sheet onOpenChange={setIsOpen} open={isOpen}>
@@ -213,13 +268,30 @@ export function CartModal({ trigger }: { trigger?: React.ReactNode }) {
                           </div>
                         </Link>
                         <div className="flex h-16 flex-col justify-between">
-                          {typeof price === 'number' && (
-                            <LocalizedPrice
-                              className="flex justify-end space-y-2 text-right text-sm"
-                              priceInIDR={priceInIDR}
-                              priceInUSD={price}
-                            />
-                          )}
+                          {(typeof price === 'number' || typeof priceInIDR === 'number') &&
+                            (() => {
+                              const productId = (item.product as Product).id
+                              const hasDiscount = Boolean(getProductDiscount(productId))
+
+                              return hasDiscount ? (
+                                <div className="flex max-w-[140px] flex-col items-end text-right">
+                                  <DiscountedPrice
+                                    productId={productId}
+                                    priceInIDR={priceInIDR}
+                                    priceInUSD={price}
+                                    className="text-sm"
+                                    as="span"
+                                    showDiscountBadge
+                                  />
+                                </div>
+                              ) : (
+                                <LocalizedPrice
+                                  className="flex justify-end space-y-2 text-right text-sm"
+                                  priceInIDR={priceInIDR}
+                                  priceInUSD={price}
+                                />
+                              )
+                            })()}
                           <div className="ml-auto flex h-9 flex-row items-center rounded-lg border">
                             <EditItemQuantityButton item={item} type="minus" />
                             <p className="w-6 text-center">
@@ -236,13 +308,33 @@ export function CartModal({ trigger }: { trigger?: React.ReactNode }) {
 
               <div className="px-4">
                 <div className="py-4 text-sm text-neutral-500 dark:text-neutral-400">
-                  {typeof cart?.subtotal === 'number' && (
-                    <div className="mb-3 flex items-center justify-between border-b border-neutral-200 pb-1 pt-1 dark:border-neutral-700">
-                      <p>Total</p>
-                      <Price
-                        amount={cart?.subtotal}
-                        className="text-right text-base text-black dark:text-white"
-                      />
+                  {pricingSummary.subtotal > 0 && (
+                    <div className="mb-3 space-y-2 border-b border-neutral-200 pb-2 pt-1 dark:border-neutral-700">
+                      {pricingSummary.discountTotal > 0 && (
+                        <>
+                          <div className="flex items-center justify-between text-sm text-neutral-500 dark:text-neutral-400">
+                            <p>Subtotal</p>
+                            <Price
+                              amount={pricingSummary.subtotal}
+                              className="text-right"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-sm font-medium text-emerald-600">
+                            <p>Potongan voucher</p>
+                            <Price
+                              amount={pricingSummary.discountTotal}
+                              className="text-right"
+                            />
+                          </div>
+                        </>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <p>Total</p>
+                        <Price
+                          amount={pricingSummary.total || cart?.subtotal || 0}
+                          className="text-right text-base text-black dark:text-white"
+                        />
+                      </div>
                     </div>
                   )}
 
