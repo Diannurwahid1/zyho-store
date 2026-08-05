@@ -28,6 +28,18 @@ import { OpenCartButton } from './OpenCart'
 // Per-item stock status fetched from server
 type StockMap = Record<string, number> // key: `${productId}:${variantId|'base'}` → current inventory
 
+const getRelationId = (value: unknown): string | undefined => {
+  if (!value) return undefined
+  if (typeof value === 'string' || typeof value === 'number') return String(value)
+  if (typeof value === 'object' && 'id' in value) {
+    const relationId = (value as { id?: string | number }).id
+    if (typeof relationId === 'string' || typeof relationId === 'number') {
+      return String(relationId)
+    }
+  }
+  return undefined
+}
+
 export function CartModal({ trigger }: { trigger?: React.ReactNode }) {
   const { cart } = useCart()
   const { getProductDiscount } = useActiveVouchers()
@@ -47,13 +59,17 @@ export function CartModal({ trigger }: { trigger?: React.ReactNode }) {
 
     const items = cart.items
       .filter((item) => typeof item.product === 'object' && item.product)
-      .map((item) => ({
-        productId: (item.product as Product).id,
-        variantId:
-          item.variant && typeof item.variant === 'object'
-            ? (item.variant as { id: string }).id
-            : undefined,
-      }))
+      .map((item) => {
+        const productId = getRelationId(item.product)
+
+        if (!productId) return null
+
+        return {
+          productId,
+          variantId: getRelationId(item.variant),
+        }
+      })
+      .filter((item): item is { productId: string; variantId: string | undefined } => Boolean(item))
 
     if (!items.length) return
 
@@ -86,11 +102,9 @@ export function CartModal({ trigger }: { trigger?: React.ReactNode }) {
     if (!cart?.items?.length || Object.keys(stockMap).length === 0) return false
     return cart.items.some((item) => {
       if (typeof item.product !== 'object' || !item.product) return false
-      const productId = (item.product as Product).id
-      const variantId =
-        item.variant && typeof item.variant === 'object'
-          ? (item.variant as { id: string }).id
-          : undefined
+      const productId = getRelationId(item.product)
+      const variantId = getRelationId(item.variant)
+      if (!productId) return false
       const key = `${productId}:${variantId ?? 'base'}`
       return (stockMap[key] ?? 1) <= 0
     })
@@ -117,7 +131,8 @@ export function CartModal({ trigger }: { trigger?: React.ReactNode }) {
 
       if (!quantity) continue
 
-      const productId = product.id
+      const productId = getRelationId(product)
+      if (!productId) continue
       const basePriceInUSD = variant?.priceInUSD ?? product.priceInUSD
       const basePriceInIDR = variant?.priceInIDR ?? product.priceInIDR
       const discount = getProductDiscount(productId)
@@ -216,13 +231,12 @@ export function CartModal({ trigger }: { trigger?: React.ReactNode }) {
                   }
 
                   // Determine stock status for this item
-                  const itemProductId = (item.product as Product).id
-                  const itemVariantId =
-                    isVariant && variant && typeof variant === 'object'
-                      ? (variant as { id: string }).id
-                      : undefined
-                  const stockKey = `${itemProductId}:${itemVariantId ?? 'base'}`
-                  const itemStock = stockMap[stockKey]
+                  const itemProductId = getRelationId(item.product)
+                  const itemVariantId = getRelationId(variant)
+                  const stockKey = itemProductId
+                    ? `${itemProductId}:${itemVariantId ?? 'base'}`
+                    : undefined
+                  const itemStock = stockKey ? stockMap[stockKey] : undefined
                   const itemOutOfStock = itemStock !== undefined && itemStock <= 0
 
                   return (
@@ -270,7 +284,16 @@ export function CartModal({ trigger }: { trigger?: React.ReactNode }) {
                         <div className="flex h-16 flex-col justify-between">
                           {(typeof price === 'number' || typeof priceInIDR === 'number') &&
                             (() => {
-                              const productId = (item.product as Product).id
+                              const productId = getRelationId(item.product)
+                              if (!productId) {
+                                return (
+                                  <LocalizedPrice
+                                    className="flex justify-end space-y-2 text-right text-sm"
+                                    priceInIDR={priceInIDR}
+                                    priceInUSD={price}
+                                  />
+                                )
+                              }
                               const hasDiscount = Boolean(getProductDiscount(productId))
 
                               return hasDiscount ? (
