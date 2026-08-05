@@ -49,7 +49,12 @@ export const CreateAccountForm: React.FC = () => {
       })
 
       if (!response.ok) {
-        const message = response.statusText || 'There was an error creating the account.'
+        const data = await response.json().catch(() => null)
+        const message =
+          data?.errors?.[0]?.message ||
+          data?.message ||
+          response.statusText ||
+          'There was an error creating the account.'
         setError(message)
         return
       }
@@ -67,9 +72,13 @@ export const CreateAccountForm: React.FC = () => {
         clearTimeout(timer)
         if (redirect) router.push(redirect)
         else router.push(`/account?success=${encodeURIComponent('Account created successfully')}`)
-      } catch (_) {
+      } catch (error) {
         clearTimeout(timer)
-        setError('There was an error with the credentials provided. Please try again.')
+        setError(
+          error instanceof Error
+            ? error.message
+            : 'There was an error with the credentials provided. Please try again.',
+        )
       }
     },
     [login, router, searchParams],

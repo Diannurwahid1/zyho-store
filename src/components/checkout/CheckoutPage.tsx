@@ -62,6 +62,9 @@ const readJSONResponse = async <T,>(response: Response): Promise<T | null> => {
   return JSON.parse(text) as T
 }
 
+const isExistingAccountErrorMessage = (message: string) =>
+  /(already|exists|registered|duplicate|taken|invalid: email|email.*invalid)/i.test(message)
+
 const calculateVoucherPreviewDiscount = (
   voucher: EligibleVoucher | null,
   subtotal: number,
@@ -425,7 +428,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
       await refreshEligibleVouchers()
 
       router.refresh()
-    } catch {
+    } catch (loginError) {
       // Login failed — try creating account via Payload REST API
       try {
         const createRes = await fetch('/api/users', {
@@ -454,10 +457,16 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
         toast.success('Akun berhasil dibuat! Selamat datang, member Bronze 🥉')
         router.refresh()
       } catch (regErr) {
-        setAuthError(
+        const registrationMessage =
           regErr instanceof Error
             ? regErr.message
-            : 'Gagal masuk atau mendaftar. Pastikan email valid dan password minimal 6 karakter.',
+            : 'Gagal masuk atau mendaftar. Pastikan email valid dan password minimal 6 karakter.'
+        const loginMessage = loginError instanceof Error ? loginError.message : ''
+
+        setAuthError(
+          isExistingAccountErrorMessage(registrationMessage)
+            ? 'Email sudah terdaftar. Jika akun ini dibuat lewat Google, lanjutkan dengan Google. Jika bukan, cek lagi password Anda atau gunakan Lupa Password.'
+            : loginMessage || registrationMessage,
         )
       }
     } finally {

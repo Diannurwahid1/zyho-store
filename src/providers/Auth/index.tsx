@@ -34,6 +34,35 @@ type AuthContext = {
 const Context = createContext({} as AuthContext)
 const apiPath = (path: string) => `/api${path.startsWith('/') ? path : `/${path}`}`
 
+const parseResponseMessage = async (res: Response, fallback: string) => {
+  const contentType = res.headers.get('content-type') || ''
+
+  try {
+    if (contentType.includes('application/json')) {
+      const data = await res.json()
+      const message =
+        data?.errors?.[0]?.message ||
+        data?.message ||
+        data?.error ||
+        data?.reason ||
+        fallback
+
+      if (/email or password provided is incorrect/i.test(String(message))) {
+        return 'Email atau password salah. Jika akun dibuat lewat Google, lanjutkan dengan Google atau reset password.'
+      }
+
+      return String(message)
+    }
+
+    const text = await res.text()
+    if (text) return text
+  } catch {
+    // Ignore response parsing failures and use the fallback message below.
+  }
+
+  return fallback
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>()
   const [authReady, setAuthReady] = useState(false)
@@ -64,10 +93,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setStatus('loggedIn')
         authGeneration.current += 1
       } else {
-        throw new Error('Invalid login')
+        throw new Error(await parseResponseMessage(res, 'Gagal membuat akun.'))
       }
     } catch (e) {
-      throw new Error('An error occurred while attempting to login.')
+      throw e instanceof Error ? e : new Error('Gagal membuat akun.')
     }
   }, [])
 
@@ -94,9 +123,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return user
       }
 
-      throw new Error('Invalid login')
+      throw new Error(await parseResponseMessage(res, 'Gagal masuk.'))
     } catch (e) {
-      throw new Error('An error occurred while attempting to login.')
+      throw e instanceof Error ? e : new Error('Gagal masuk.')
     }
   }, [])
 
@@ -178,10 +207,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (errors) throw new Error(errors[0].message)
         setUser(data?.loginUser?.user)
       } else {
-        throw new Error('Invalid login')
+        throw new Error(await parseResponseMessage(res, 'Gagal mengirim email reset password.'))
       }
     } catch (e) {
-      throw new Error('An error occurred while attempting to login.')
+      throw e instanceof Error ? e : new Error('Gagal mengirim email reset password.')
     }
   }, [])
 
@@ -207,10 +236,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setStatus(data?.loginUser?.user ? 'loggedIn' : undefined)
         authGeneration.current += 1
       } else {
-        throw new Error('Invalid login')
+        throw new Error(await parseResponseMessage(res, 'Gagal mereset password.'))
       }
     } catch (e) {
-      throw new Error('An error occurred while attempting to login.')
+      throw e instanceof Error ? e : new Error('Gagal mereset password.')
     }
   }, [])
 

@@ -62,6 +62,11 @@ export const getHighestPrioritySignupCampaign = async (req: PayloadRequest) => {
 const buildUserCampaignKey = (userID: string | number, campaignID: string | number) =>
   `${userID}:${campaignID}`
 
+const isClaimKeyFieldInvalid = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  return /claimKey/i.test(message) && /invalid/i.test(message)
+}
+
 const createRewardLog = async ({
   bucket,
   bucketID,
@@ -83,22 +88,47 @@ const createRewardLog = async ({
   user: UserDoc
   voucher?: number | string | null
 }) => {
-  return req.payload.create({
-    collection: 'signup-campaign-rewards' as any,
-    data: {
-      bucketID: bucketID || undefined,
-      bucketLabel: bucket?.label || undefined,
-      campaign: campaign.id,
-      claimKey: claimKey || undefined,
-      reason: reason || undefined,
-      result,
-      user: user.id,
-      userCampaignKey: buildUserCampaignKey(user.id, campaign.id),
-      voucher: voucher || undefined,
-    } as any,
-    overrideAccess: true,
-    req,
-  })
+  const data = {
+    bucketID: bucketID || undefined,
+    bucketLabel: bucket?.label || undefined,
+    campaign: campaign.id,
+    claimKey: claimKey || undefined,
+    reason: reason || undefined,
+    result,
+    user: user.id,
+    userCampaignKey: buildUserCampaignKey(user.id, campaign.id),
+    voucher: voucher || undefined,
+  } as any
+
+  try {
+    return await req.payload.create({
+      collection: 'signup-campaign-rewards' as any,
+      data,
+      overrideAccess: true,
+      req,
+    })
+  } catch (error) {
+    if (!data.claimKey || !isClaimKeyFieldInvalid(error)) {
+      throw error
+    }
+
+    req.payload.logger.warn(
+      {
+        campaignID: campaign.id,
+        userID: user.id,
+      },
+      '[SignupVoucherCampaign] claimKey field unavailable, retrying reward log without claimKey',
+    )
+
+    delete data.claimKey
+
+    return req.payload.create({
+      collection: 'signup-campaign-rewards' as any,
+      data,
+      overrideAccess: true,
+      req,
+    })
+  }
 }
 
 const reserveBucketSlot = async ({
