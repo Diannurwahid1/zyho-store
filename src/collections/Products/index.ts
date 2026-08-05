@@ -64,6 +64,56 @@ const getSoldCountCache = async (req: any) => {
   return soldCountByProduct
 }
 
+const getPerUnitInventoryCache = async (req: any) => {
+  if (!req?.context) req.context = {}
+  if (req.context.productPerUnitInventoryCache) {
+    return req.context.productPerUnitInventoryCache as {
+      byProduct: Record<string, number>
+      byVariant: Record<string, number>
+    }
+  }
+
+  const { docs: units } = await req.payload.find({
+    collection: 'digital-stock-units',
+    depth: 0,
+    limit: 5000,
+    overrideAccess: true,
+    pagination: false,
+    req,
+    where: {
+      and: [
+        { status: { equals: 'available' } },
+        {
+          or: [
+            { redeemEnabled: { exists: false } },
+            { redeemEnabled: { equals: false } },
+          ],
+        },
+      ],
+    } as any,
+  })
+
+  const byProduct: Record<string, number> = {}
+  const byVariant: Record<string, number> = {}
+
+  for (const unit of units as any[]) {
+    const productId = typeof unit?.product === 'object' ? unit.product?.id : unit?.product
+    if (!productId) continue
+
+    const productKey = String(productId)
+    byProduct[productKey] = (byProduct[productKey] || 0) + 1
+
+    if (unit?.variant) {
+      const variantKey = `${productKey}:${String(unit.variant)}`
+      byVariant[variantKey] = (byVariant[variantKey] || 0) + 1
+    }
+  }
+
+  const cache = { byProduct, byVariant }
+  req.context.productPerUnitInventoryCache = cache
+  return cache
+}
+
 export const ProductsCollection: CollectionOverride = ({ defaultCollection }) => ({
   ...defaultCollection,
   hooks: {
@@ -71,16 +121,48 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
     afterRead: [
       ...(defaultCollection.hooks?.afterRead || []),
       async ({ doc, req }) => {
-        if (!doc || shouldUseManualSoldCountOnly(req)) return doc
+        if (!doc) return doc
+
+        const nextDoc = { ...doc } as any
+
+        if (nextDoc.digitalFulfillmentMode === 'per_unit_stock' && req?.payload) {
+          const inventoryCache = await getPerUnitInventoryCache(req)
+          const productKey = String(nextDoc.id)
+
+          nextDoc.inventory = inventoryCache.byProduct[productKey] || 0
+
+          if (nextDoc.variants?.docs && Array.isArray(nextDoc.variants.docs)) {
+            nextDoc.variants = {
+              ...nextDoc.variants,
+              docs: nextDoc.variants.docs.map((variant: any) => {
+                if (!variant || typeof variant !== 'object') return variant
+                const variantKey = `${productKey}:${String(variant.id)}`
+                return {
+                  ...variant,
+                  inventory: inventoryCache.byVariant[variantKey] || 0,
+                }
+              }),
+            }
+          } else if (Array.isArray(nextDoc.variants)) {
+            nextDoc.variants = nextDoc.variants.map((variant: any) => {
+              if (!variant || typeof variant !== 'object') return variant
+              const variantKey = `${productKey}:${String(variant.id)}`
+              return {
+                ...variant,
+                inventory: inventoryCache.byVariant[variantKey] || 0,
+              }
+            })
+          }
+        }
+
+        if (shouldUseManualSoldCountOnly(req)) return nextDoc
 
         const soldCountByProduct = await getSoldCountCache(req)
-        const manualSoldCount = typeof doc.soldCount === 'number' ? doc.soldCount : 0
-        const actualSoldCount = soldCountByProduct[String(doc.id)] || 0
+        const manualSoldCount = typeof nextDoc.soldCount === 'number' ? nextDoc.soldCount : 0
+        const actualSoldCount = soldCountByProduct[String(nextDoc.id)] || 0
 
-        return {
-          ...doc,
-          soldCount: manualSoldCount + actualSoldCount,
-        }
+        nextDoc.soldCount = manualSoldCount + actualSoldCount
+        return nextDoc
       },
     ],
     beforeChange: [
