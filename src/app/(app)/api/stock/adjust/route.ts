@@ -95,6 +95,12 @@ export async function POST(req: NextRequest) {
               ? { variant: { equals: normalizedVariantID } }
               : { variant: { exists: false } },
             { status: { equals: 'available' } },
+            {
+              or: [
+                { redeemEnabled: { exists: false } },
+                { redeemEnabled: { equals: false } },
+              ],
+            },
           ],
         },
       })
@@ -163,6 +169,12 @@ export async function POST(req: NextRequest) {
                 ? { variant: { equals: normalizedVariantID } }
                 : { variant: { exists: false } },
               { status: { equals: 'available' } },
+              {
+                or: [
+                  { redeemEnabled: { exists: false } },
+                  { redeemEnabled: { equals: false } },
+                ],
+              },
             ],
           },
         })

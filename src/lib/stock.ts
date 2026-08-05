@@ -16,6 +16,15 @@ import type { BasePayload } from 'payload'
 
 export const RESERVATION_TTL_MINUTES = 10
 
+const isPerUnitDigitalStockProduct = (product: unknown) =>
+  Boolean(
+    product &&
+      typeof product === 'object' &&
+      'digitalFulfillmentMode' in product &&
+      (product as { digitalFulfillmentMode?: string | null }).digitalFulfillmentMode ===
+        'per_unit_stock',
+  )
+
 // ---------------------------------------------------------------------------
 // Internal helper: tulis satu baris ke StockLedger
 // ---------------------------------------------------------------------------
@@ -80,12 +89,32 @@ export async function getAvailableStock(
 
   let inventory = 0
 
-  if (variantId) {
-    // Cari variant
+  if (isPerUnitDigitalStockProduct(product)) {
+    const availableUnits = await payload.find({
+      collection: 'digital-stock-units',
+      depth: 0,
+      limit: 1000,
+      overrideAccess: true,
+      pagination: false,
+      where: {
+        and: [
+          { product: { equals: productId } },
+          variantId ? { variant: { equals: String(variantId) } } : { variant: { exists: false } },
+          { status: { equals: 'available' } },
+          {
+            or: [
+              { redeemEnabled: { exists: false } },
+              { redeemEnabled: { equals: false } },
+            ],
+          },
+        ],
+      } as any,
+    })
+
+    inventory = availableUnits.docs.length
+  } else if (variantId) {
     const variants = (product as any)?.variants?.docs || []
-    const variant = variants.find(
-      (v: any) => typeof v === 'object' && v.id === variantId,
-    )
+    const variant = variants.find((v: any) => typeof v === 'object' && v.id === variantId)
     inventory = variant?.inventory ?? 0
   } else {
     inventory = (product as any)?.inventory ?? 0

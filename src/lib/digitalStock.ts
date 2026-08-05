@@ -163,6 +163,12 @@ export const assignDigitalStockToOrder = async ({
             { product: { equals: productID } },
             variantID ? { variant: { equals: String(variantID) } } : { variant: { exists: false } },
             { status: { equals: 'available' } },
+            {
+              or: [
+                { redeemEnabled: { exists: false } },
+                { redeemEnabled: { equals: false } },
+              ],
+            },
           ],
         },
       })
