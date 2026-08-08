@@ -195,6 +195,8 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
       async ({ doc, req }) => {
         if (!doc) return doc
 
+        if (req?.context?.skipProductComputedFields) return doc
+
         const nextDoc = { ...doc } as any
 
         if (nextDoc.digitalFulfillmentMode === 'per_unit_stock' && req?.payload) {
@@ -244,10 +246,12 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
               if (!bundleProduct) {
                 bundleProduct = await req.payload.findByID({
                   collection: 'products',
+                  context: {
+                    skipProductComputedFields: true,
+                  },
                   id: item.productId,
-                  depth: 1,
+                  depth: 0,
                   overrideAccess: true,
-                  req,
                 })
                 bundleCache.set(cacheKey, bundleProduct)
               }
@@ -302,8 +306,10 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
         if (!data || typeof data !== 'object') return data
 
         const nextData = { ...data } as any
-        const normalizedBundle =
-          normalizeBundleConfigInput(nextData.bundle) || normalizeBundleConfigInput(nextData.bundleConfig)
+        const hasNativeBundleInput = Object.prototype.hasOwnProperty.call(nextData, 'bundle')
+        const normalizedBundle = hasNativeBundleInput
+          ? normalizeBundleConfigInput(nextData.bundle)
+          : normalizeBundleConfigInput(nextData.bundleConfig)
 
         if (!normalizedBundle) {
           nextData.bundleConfig = null
@@ -323,10 +329,12 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
 
           const bundleChild = await req.payload.findByID({
             collection: 'products',
+            context: {
+              skipProductComputedFields: true,
+            },
             id: item.productId,
             depth: 0,
             overrideAccess: true,
-            req,
           })
 
           if (!bundleChild) {
