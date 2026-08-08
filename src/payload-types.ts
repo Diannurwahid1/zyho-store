@@ -333,6 +333,11 @@ export interface Order {
         product?: (number | null) | Product;
         variant?: (number | null) | Variant;
         quantity: number;
+        bundleParentProduct?: (number | null) | Product;
+        bundleParentTitle?: string | null;
+        bundleDiscountPercent?: number | null;
+        bundleUnitPriceInIDR?: number | null;
+        bundleUnitPriceInUSD?: number | null;
         id?: string | null;
       }[]
     | null;
@@ -3093,6 +3098,11 @@ export interface OrdersSelect<T extends boolean = true> {
         product?: T;
         variant?: T;
         quantity?: T;
+        bundleParentProduct?: T;
+        bundleParentTitle?: T;
+        bundleDiscountPercent?: T;
+        bundleUnitPriceInIDR?: T;
+        bundleUnitPriceInUSD?: T;
         id?: T;
       };
   shippingAddress?:

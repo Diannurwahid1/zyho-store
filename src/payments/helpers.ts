@@ -5,7 +5,7 @@ import {
     getCartItemUnitPrice,
 } from '@/lib/buyNow'
 import { assertOwnedActiveCheckoutSession } from '@/lib/checkoutSessionServer'
-import { getBundleReservationEntries } from '@/lib/bundles'
+import { expandBundleCartItems, getBundleReservationEntries } from '@/lib/bundles'
 import { assignDigitalStockToOrder } from '@/lib/digitalStock'
 import { confirmStockReservation } from '@/lib/stock'
 import {
@@ -379,12 +379,26 @@ export const finalizePaidOrder = async ({
     currencyCode === 'IDR'
       ? Math.max(1, Math.floor(amount / 1000))
       : Math.max(1, Math.floor(amount / 100) * 10)
+  const orderItems = expandBundleCartItems(cartItems).map((item) => ({
+    product: item.product,
+    quantity: item.quantity,
+    variant: item.variant,
+    ...(item.bundleParentId
+      ? {
+          bundleParentProduct: item.bundleParentId,
+          bundleParentTitle: item.bundleParentTitle,
+          bundleDiscountPercent: item.bundleComponentDiscountPercent,
+          bundleUnitPriceInIDR: item.bundleComponentUnitPriceInIDR,
+          bundleUnitPriceInUSD: item.bundleComponentUnitPriceInUSD,
+        }
+      : {}),
+  }))
   const orderData: Record<string, any> = {
     customer: customerID ?? null,
     customerEmail,
     discountAmount,
     status: 'completed',
-    items: cartItems,
+    items: orderItems,
     amount,
     currency: currencyCode,
     memberTierSnapshot: req.user?.memberTier ?? 'bronze',
@@ -418,7 +432,11 @@ export const finalizePaidOrder = async ({
   const txData: Record<string, any> = {
     paymentMethod,
     status: 'succeeded',
-    items: cartItems,
+    items: orderItems.map(({ product, quantity, variant }) => ({
+      product,
+      quantity,
+      variant,
+    })),
     amount,
     currency: currencyCode,
     customer: customerID ?? null,

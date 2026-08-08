@@ -163,6 +163,8 @@ export const expandBundleCartItems = (cartItems: any[]) => {
       expanded.push({
         ...item,
         bundleComponentDiscountPercent: bundleItem.discountPercent,
+        bundleComponentUnitPriceInIDR: getBundleItemDiscountedUnitPrice(bundleItem, 'IDR'),
+        bundleComponentUnitPriceInUSD: getBundleItemDiscountedUnitPrice(bundleItem, 'USD'),
         bundleParentId: normalizeID(product),
         bundleParentTitle:
           typeof product === 'object' && product && 'title' in product ? product.title : undefined,

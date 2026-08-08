@@ -18,6 +18,7 @@ import {
     getCartItemUnitPrice,
     matchesBuyNowItem,
 } from '@/lib/buyNow'
+import { expandBundleCartItems } from '@/lib/bundles'
 import type { EligibleVoucher } from '@/lib/vouchers'
 import { Address } from '@/payload-types'
 import { useAuth } from '@/providers/Auth'
@@ -189,6 +190,10 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
         return true
       }),
     [checkoutItems, checkoutSubtotal, baseVouchers],
+  )
+  const checkoutDisplayItems = useMemo(
+    () => expandBundleCartItems(checkoutItems),
+    [checkoutItems],
   )
   const selectedVoucher = useMemo(
     () => eligibleVouchers.find((voucher) => voucher.code === selectedVoucherCode) || null,
@@ -1222,7 +1227,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
       {!cartIsEmpty && (
         <div className="flex basis-full flex-col gap-8 rounded-3xl border-none bg-primary/5 p-8 lg:basis-1/3 lg:pl-8">
           <h2 className="text-3xl font-medium">Your cart</h2>
-          {checkoutItems.map((item, index) => {
+          {checkoutDisplayItems.map((item, index) => {
             if (typeof item.product === 'object' && item.product) {
               const {
                 product,
@@ -1236,6 +1241,12 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
               let image = gallery?.[0]?.image || meta?.image
               let price = product?.priceInUSD
               let priceInIDR = product?.priceInIDR
+              const bundleDiscountPercent = Number(item.bundleComponentDiscountPercent || 0)
+
+              if (item.bundleParentId) {
+                price = Number(item.bundleComponentUnitPriceInUSD || 0)
+                priceInIDR = Number(item.bundleComponentUnitPriceInIDR || 0)
+              }
 
               const isVariant = Boolean(variant) && typeof variant === 'object'
 
@@ -1296,9 +1307,18 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
                         {'x'}
                         {quantity}
                       </div>
+                      {item.bundleParentId && (
+                        <p className="text-xs font-semibold text-amber-500">
+                          Bagian dari {item.bundleParentTitle || 'bundle'}
+                        </p>
+                      )}
                     </div>
 
-                    {(typeof price === 'number' || typeof priceInIDR === 'number') && (
+                    {bundleDiscountPercent >= 100 ? (
+                      <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-sm font-bold text-emerald-500">
+                        GRATIS
+                      </span>
+                    ) : (typeof price === 'number' || typeof priceInIDR === 'number') && (
                       <LocalizedPrice
                         as="span"
                         currencyCode={activeCurrencyCode}

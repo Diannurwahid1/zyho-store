@@ -15,6 +15,9 @@ type Props = {
    * Force all formatting to a particular currency.
    */
   currencyCode?: SupportedCurrencyCode
+  bundleDiscountPercent?: number | null
+  unitPriceInIDR?: number | null
+  unitPriceInUSD?: number | null
 }
 
 export const ProductItem: React.FC<Props> = ({
@@ -23,6 +26,9 @@ export const ProductItem: React.FC<Props> = ({
   quantity,
   variant,
   currencyCode,
+  bundleDiscountPercent,
+  unitPriceInIDR,
+  unitPriceInUSD,
 }) => {
   const { title } = product
 
@@ -60,8 +66,13 @@ export const ProductItem: React.FC<Props> = ({
     }
   }
 
-  const itemPrice = variant?.priceInUSD || product.priceInUSD
-  const itemPriceIDR = ('priceInIDR' in (variant || {}) ? (variant as any).priceInIDR : undefined) || product.priceInIDR
+  const itemPrice = typeof unitPriceInUSD === 'number'
+    ? unitPriceInUSD
+    : variant?.priceInUSD || product.priceInUSD
+  const itemPriceIDR = typeof unitPriceInIDR === 'number'
+    ? unitPriceInIDR
+    : ('priceInIDR' in (variant || {}) ? (variant as any).priceInIDR : undefined) || product.priceInIDR
+  const isFreeBundleItem = typeof bundleDiscountPercent === 'number' && bundleDiscountPercent >= 100
   const itemURL = `/products/${product.slug}${variant ? `?variant=${variant.id}` : ''}`
 
   return (
@@ -96,9 +107,18 @@ export const ProductItem: React.FC<Props> = ({
             {'x'}
             {quantity}
           </div>
+          {typeof bundleDiscountPercent === 'number' && (
+            <p className="text-xs font-semibold text-amber-500">
+              Diskon bundle {bundleDiscountPercent}%
+            </p>
+          )}
         </div>
 
-        {itemPrice && quantity && (
+        {isFreeBundleItem ? (
+          <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-sm font-bold text-emerald-500">
+            GRATIS
+          </span>
+        ) : (typeof itemPrice === 'number' || typeof itemPriceIDR === 'number') && quantity ? (
           <div className="text-right">
             <p className="font-medium text-lg">Subtotal</p>
             <div className="font-mono text-primary/50 text-sm">
@@ -110,7 +130,7 @@ export const ProductItem: React.FC<Props> = ({
               />
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   )

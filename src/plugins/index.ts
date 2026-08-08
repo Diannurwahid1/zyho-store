@@ -3,6 +3,7 @@ import { formBuilderPlugin } from '@payloadcms/plugin-form-builder'
 import { seoPlugin } from '@payloadcms/plugin-seo'
 import { GenerateTitle, GenerateURL } from '@payloadcms/plugin-seo/types'
 import { FixedToolbarFeature, HeadingFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
+import type { Field } from 'payload'
 import { Plugin } from 'payload'
 
 import { nowpaymentsAdapter } from '@/payments/nowpayments/index'
@@ -33,6 +34,68 @@ const generateURL: GenerateURL<Product | Page> = ({ doc }) => {
 
   return doc?.slug ? `${url}/${doc.slug}` : url
 }
+
+const bundleOrderItemSnapshotFields: Field[] = [
+  {
+    name: 'bundleParentProduct',
+    type: 'relationship',
+    relationTo: 'products',
+    admin: { readOnly: true },
+  },
+  {
+    name: 'bundleParentTitle',
+    type: 'text',
+    admin: { readOnly: true },
+  },
+  {
+    name: 'bundleDiscountPercent',
+    type: 'number',
+    min: 0,
+    max: 100,
+    admin: { readOnly: true },
+  },
+  {
+    name: 'bundleUnitPriceInIDR',
+    type: 'number',
+    min: 0,
+    admin: { readOnly: true },
+  },
+  {
+    name: 'bundleUnitPriceInUSD',
+    type: 'number',
+    min: 0,
+    admin: { readOnly: true },
+  },
+]
+
+const extendOrderItemFields = (fields: Field[]): Field[] =>
+  fields.map((field) => {
+    if (field.type === 'array' && field.name === 'items') {
+      return {
+        ...field,
+        fields: [...field.fields, ...bundleOrderItemSnapshotFields],
+      }
+    }
+
+    if (field.type === 'tabs') {
+      return {
+        ...field,
+        tabs: field.tabs.map((tab) => ({
+          ...tab,
+          fields: extendOrderItemFields(tab.fields),
+        })),
+      }
+    }
+
+    if ('fields' in field && Array.isArray(field.fields)) {
+      return {
+        ...field,
+        fields: extendOrderItemFields(field.fields),
+      } as Field
+    }
+
+    return field
+  })
 
 export const plugins: Plugin[] = [
   seoPlugin({
@@ -130,7 +193,7 @@ export const plugins: Plugin[] = [
           ],
         },
         fields: [
-          ...defaultCollection.fields,
+          ...extendOrderItemFields(defaultCollection.fields),
           {
             name: 'pointsEarned',
             type: 'number',

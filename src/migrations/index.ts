@@ -11,6 +11,7 @@ import * as migration_20260730_103500_products_custom_badge from './20260730_103
 import * as migration_20260805_113000_digital_stock_redeem from './20260805_113000_digital_stock_redeem';
 import * as migration_20260808_120000_products_bundle_config from './20260808_120000_products_bundle_config';
 import * as migration_20260808_190145_products_native_bundle_fields from './20260808_190145_products_native_bundle_fields';
+import * as migration_20260809_041500_order_bundle_item_snapshots from './20260809_041500_order_bundle_item_snapshots';
 
 export const migrations = [
   {
@@ -77,5 +78,10 @@ export const migrations = [
     up: migration_20260808_190145_products_native_bundle_fields.up,
     down: migration_20260808_190145_products_native_bundle_fields.down,
     name: '20260808_190145_products_native_bundle_fields'
+  },
+  {
+    up: migration_20260809_041500_order_bundle_item_snapshots.up,
+    down: migration_20260809_041500_order_bundle_item_snapshots.down,
+    name: '20260809_041500_order_bundle_item_snapshots',
   },
 ];
