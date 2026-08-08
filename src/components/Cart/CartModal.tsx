@@ -21,6 +21,7 @@ import { usePathname } from 'next/navigation'
 import React, { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { isBundleProduct } from '@/lib/bundles'
 import { getProductArtworkImages } from '@/lib/productArtwork'
 import { Product } from '@/payload-types'
 import { DeleteItemButton } from './DeleteItemButton'
@@ -262,6 +263,7 @@ export function CartModal({ trigger }: { trigger?: React.ReactNode }) {
                               alt={product?.title || ''}
                               className="h-full w-full"
                               images={getProductArtworkImages(product as any, 4)}
+                              isBundle={isBundleProduct(product)}
                               mediaFallback={image || null}
                             />
                           </div>

@@ -41,8 +41,10 @@ export const getProductArtworkImages = (product: any, max = 4): ArtworkImage[] =
   const bundleItems = getNormalizedBundleItems(product)
 
   if (bundleItems.length > 0) {
-    const bundleImages = bundleItems
-      .flatMap((item) => getDirectProductImages(item.product))
+    const bundleImages = [
+      ...getDirectProductImages(product).slice(0, 1),
+      ...bundleItems.flatMap((item) => getDirectProductImages(item.product).slice(0, 1)),
+    ]
       .filter((image, index, list) => list.findIndex((item) => item.url === image.url) === index)
 
     if (bundleImages.length > 0) {

@@ -20,6 +20,7 @@ interface ShowcaseProduct {
   priceInUSD?: number
   priceInIDR?: number
   image: string
+  isBundle?: boolean
   description: string
   badge?: string
   customBadge?: string
@@ -138,6 +139,7 @@ export const ProductShowcase: React.FC<ProductShowcaseProps> = ({
                       alt={product.title}
                       className="h-full w-full"
                       images={Array.isArray(product.artworkImages) ? product.artworkImages : []}
+                      isBundle={product.isBundle}
                     />
                   </div>
                 </Link>

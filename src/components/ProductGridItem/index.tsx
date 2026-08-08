@@ -4,6 +4,7 @@ import { DiscountedPrice } from '@/components/DiscountedPrice'
 import { ProductArtwork } from '@/components/product/ProductArtwork'
 import { ProductCardActions } from '@/components/ProductCardActions'
 import type { Media as MediaType } from '@/payload-types'
+import { isBundleProduct } from '@/lib/bundles'
 import { getProductArtworkImages } from '@/lib/productArtwork'
 import { getProductBadgeLabel } from '@/utilities/productBadge'
 import clsx from 'clsx'
@@ -69,6 +70,7 @@ export const ProductGridItem: React.FC<Props> = ({ product }) => {
               alt={title || 'Product image'}
               className="h-full w-full transition duration-500 group-hover:scale-[1.02]"
               images={artworkImages}
+              isBundle={isBundleProduct(product)}
               mediaFallback={image}
               priority={false}
             />

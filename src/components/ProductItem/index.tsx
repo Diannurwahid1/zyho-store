@@ -1,5 +1,6 @@
 import { LocalizedPrice } from '@/components/LocalizedPrice'
 import { ProductArtwork } from '@/components/product/ProductArtwork'
+import { isBundleProduct } from '@/lib/bundles'
 import { getProductArtworkImages } from '@/lib/productArtwork'
 import { Media as MediaType, Product, Variant } from '@/payload-types'
 import type { SupportedCurrencyCode } from '@/utilities/pricing'
@@ -71,6 +72,7 @@ export const ProductItem: React.FC<Props> = ({
             alt={title}
             className="rounded-lg"
             images={artworkImages}
+            isBundle={isBundleProduct(product)}
             mediaFallback={image || null}
           />
         </div>

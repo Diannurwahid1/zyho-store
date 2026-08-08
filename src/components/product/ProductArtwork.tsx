@@ -12,6 +12,7 @@ type Props = {
   alt: string
   className?: string
   images: ArtworkImage[]
+  isBundle?: boolean
   mediaFallback?: MediaType | null
   priority?: boolean
 }
@@ -41,10 +42,11 @@ export const ProductArtwork: React.FC<Props> = ({
   alt,
   className,
   images,
+  isBundle = false,
   mediaFallback,
   priority,
 }) => {
-  if (images.length <= 1) {
+  if (!isBundle || images.length <= 1) {
     const firstImage = images[0]
 
     return (

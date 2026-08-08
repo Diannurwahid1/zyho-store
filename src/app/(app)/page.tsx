@@ -6,6 +6,7 @@ import { PromoBanner } from '@/components/PromoBanner'
 import { PromoSection } from '@/components/PromoSection'
 import { Testimonials } from '@/components/Testimonials'
 import { homeStaticData } from '@/endpoints/seed/home-static'
+import { getNormalizedBundleItems } from '@/lib/bundles'
 import { getProductArtworkImages } from '@/lib/productArtwork'
 import { generateMeta } from '@/utilities/generateMeta'
 import { getClientLanguage } from '@/utilities/getClientLanguage'
@@ -129,6 +130,7 @@ export default async function Page() {
         })),
       image: imageUrl || '',
       artworkImages,
+      isBundle: getNormalizedBundleItems(product as any).length > 0,
       description:
         product.shortDescription ||
         (language === 'id'

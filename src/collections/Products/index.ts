@@ -250,7 +250,7 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
                     skipProductComputedFields: true,
                   },
                   id: item.productId,
-                  depth: 0,
+                  depth: 1,
                   overrideAccess: true,
                 })
                 bundleCache.set(cacheKey, bundleProduct)

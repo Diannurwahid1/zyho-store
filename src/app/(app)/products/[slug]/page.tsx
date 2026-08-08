@@ -169,6 +169,7 @@ export default async function ProductPage({ params }: Args) {
                       alt={product.title}
                       className="h-full w-full"
                       images={bundleArtworkImages}
+                      isBundle={bundleItems.length > 0}
                       mediaFallback={metaImage || null}
                       priority
                     />
@@ -216,6 +217,7 @@ export default async function ProductPage({ params }: Args) {
                     alt={product.title}
                     className="h-full w-full"
                     images={bundleArtworkImages}
+                    isBundle={bundleItems.length > 0}
                     mediaFallback={metaImage || null}
                     priority
                   />
