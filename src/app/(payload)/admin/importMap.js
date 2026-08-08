@@ -18,11 +18,14 @@ import { MetaImageComponent as MetaImageComponent_a8a977ebc872c5d5ea7ee689724c08
 import { MetaDescriptionComponent as MetaDescriptionComponent_a8a977ebc872c5d5ea7ee689724c0860 } from '@payloadcms/plugin-seo/client'
 import { PreviewComponent as PreviewComponent_a8a977ebc872c5d5ea7ee689724c0860 } from '@payloadcms/plugin-seo/client'
 import { SlugField as SlugField_2b8867833a34864a02ddf429b0728a40 } from '@payloadcms/next/client'
+import { ManualOrderField as ManualOrderField_1d08f08b2a4dd9c8ef90e12a7c1734f3 } from '@/collections/DigitalStockUnits/ManualOrderField'
 import { ChatButtonCell as ChatButtonCell_1c9e8136f5e26f970296965cc98c6350 } from '@/collections/SupportTickets/ChatButtonCell'
 import { AdminChatView as AdminChatView_cc7ff3d4539a81e1420ab4d73cfe8d7c } from '@/collections/SupportTickets/AdminChatView'
+import { WaitlistBlastField as WaitlistBlastField_7722e1ce19f9f4c82638f4f6933e9330 } from '@/collections/Waitlists/BlastField'
 import { VariantOptionsSelector as VariantOptionsSelector_b91672ccd6e8b071c11142ab941fedfb } from '@payloadcms/plugin-ecommerce/rsc'
 import { PriceCell as PriceCell_e27bf7b8cc50640dcdd584767b8eac3c } from '@payloadcms/plugin-ecommerce/client'
 import { PriceInput as PriceInput_b91672ccd6e8b071c11142ab941fedfb } from '@payloadcms/plugin-ecommerce/rsc'
+import { DuplicateProductCell as DuplicateProductCell_95a0f842baaf77c4aa11551c23c23e1d } from '@/collections/Products/DuplicateProductCell'
 import { HorizontalRuleFeatureClient as HorizontalRuleFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { StockAdjustmentField as StockAdjustmentField_69bcdc318895da7bd33ec1752c355dd2 } from '@/components/StockAdjustmentField'
 import { AdminWhatsAppBlastField as AdminWhatsAppBlastField_d46d3fee865d91c666180ff549d69792 } from '@/components/AdminWhatsAppBlastField'
@@ -55,11 +58,14 @@ export const importMap = {
   "@payloadcms/plugin-seo/client#MetaDescriptionComponent": MetaDescriptionComponent_a8a977ebc872c5d5ea7ee689724c0860,
   "@payloadcms/plugin-seo/client#PreviewComponent": PreviewComponent_a8a977ebc872c5d5ea7ee689724c0860,
   "@payloadcms/next/client#SlugField": SlugField_2b8867833a34864a02ddf429b0728a40,
+  "@/collections/DigitalStockUnits/ManualOrderField#ManualOrderField": ManualOrderField_1d08f08b2a4dd9c8ef90e12a7c1734f3,
   "@/collections/SupportTickets/ChatButtonCell#ChatButtonCell": ChatButtonCell_1c9e8136f5e26f970296965cc98c6350,
   "@/collections/SupportTickets/AdminChatView#AdminChatView": AdminChatView_cc7ff3d4539a81e1420ab4d73cfe8d7c,
+  "@/collections/Waitlists/BlastField#WaitlistBlastField": WaitlistBlastField_7722e1ce19f9f4c82638f4f6933e9330,
   "@payloadcms/plugin-ecommerce/rsc#VariantOptionsSelector": VariantOptionsSelector_b91672ccd6e8b071c11142ab941fedfb,
   "@payloadcms/plugin-ecommerce/client#PriceCell": PriceCell_e27bf7b8cc50640dcdd584767b8eac3c,
   "@payloadcms/plugin-ecommerce/rsc#PriceInput": PriceInput_b91672ccd6e8b071c11142ab941fedfb,
+  "@/collections/Products/DuplicateProductCell#DuplicateProductCell": DuplicateProductCell_95a0f842baaf77c4aa11551c23c23e1d,
   "@payloadcms/richtext-lexical/client#HorizontalRuleFeatureClient": HorizontalRuleFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@/components/StockAdjustmentField#StockAdjustmentField": StockAdjustmentField_69bcdc318895da7bd33ec1752c355dd2,
   "@/components/AdminWhatsAppBlastField#AdminWhatsAppBlastField": AdminWhatsAppBlastField_d46d3fee865d91c666180ff549d69792,
