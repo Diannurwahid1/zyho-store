@@ -252,6 +252,17 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
                   id: item.productId,
                   depth: 1,
                   overrideAccess: true,
+                  select: {
+                    title: true,
+                    slug: true,
+                    gallery: true,
+                    meta: true,
+                    priceInIDR: true,
+                    priceInUSD: true,
+                    inventory: true,
+                    digitalFulfillmentMode: true,
+                    bundleConfig: true,
+                  },
                 })
                 bundleCache.set(cacheKey, bundleProduct)
               }
