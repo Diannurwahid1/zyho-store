@@ -1,6 +1,7 @@
 import { LocalizedPrice } from '@/components/LocalizedPrice'
-import { Media } from '@/components/Media'
-import { Product, Variant } from '@/payload-types'
+import { ProductArtwork } from '@/components/product/ProductArtwork'
+import { getProductArtworkImages } from '@/lib/productArtwork'
+import { Media as MediaType, Product, Variant } from '@/payload-types'
 import type { SupportedCurrencyCode } from '@/utilities/pricing'
 import Link from 'next/link'
 
@@ -25,12 +26,17 @@ export const ProductItem: React.FC<Props> = ({
   const { title } = product
 
   const metaImage =
-    product.meta?.image && typeof product.meta?.image !== 'string' ? product.meta.image : undefined
+    product.meta?.image && typeof product.meta?.image === 'object'
+      ? (product.meta.image as MediaType)
+      : undefined
 
   const firstGalleryImage =
-    typeof product.gallery?.[0]?.image !== 'string' ? product.gallery?.[0]?.image : undefined
+    typeof product.gallery?.[0]?.image === 'object'
+      ? (product.gallery?.[0]?.image as MediaType)
+      : undefined
 
   let image = firstGalleryImage || metaImage
+  const artworkImages = getProductArtworkImages(product as any, 4)
 
   const isVariant = Boolean(variant) && typeof variant === 'object'
 
@@ -49,7 +55,7 @@ export const ProductItem: React.FC<Props> = ({
     })
 
     if (imageVariant && typeof imageVariant.image !== 'string') {
-      image = imageVariant.image
+      image = imageVariant.image as MediaType
     }
   }
 
@@ -61,9 +67,12 @@ export const ProductItem: React.FC<Props> = ({
     <div className="flex items-center gap-4">
       <div className="flex items-stretch justify-stretch h-20 w-20 p-2 rounded-lg border">
         <div className="relative w-full h-full">
-          {image && typeof image !== 'string' && (
-            <Media className="" fill imgClassName="rounded-lg object-cover" resource={image} />
-          )}
+          <ProductArtwork
+            alt={title}
+            className="rounded-lg"
+            images={artworkImages}
+            mediaFallback={image || null}
+          />
         </div>
       </div>
       <div className="flex grow justify-between items-center">

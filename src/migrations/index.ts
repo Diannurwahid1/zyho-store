@@ -9,6 +9,7 @@ import * as migration_20260725_020850_signup_voucher_campaigns from './20260725_
 import * as migration_20260729_111504_creator_creator_snapshot_fields from './20260729_111504_creator_creator_snapshot_fields';
 import * as migration_20260730_103500_products_custom_badge from './20260730_103500_products_custom_badge';
 import * as migration_20260805_113000_digital_stock_redeem from './20260805_113000_digital_stock_redeem';
+import * as migration_20260808_120000_products_bundle_config from './20260808_120000_products_bundle_config';
 
 export const migrations = [
   {
@@ -65,5 +66,10 @@ export const migrations = [
     up: migration_20260805_113000_digital_stock_redeem.up,
     down: migration_20260805_113000_digital_stock_redeem.down,
     name: '20260805_113000_digital_stock_redeem',
+  },
+  {
+    up: migration_20260808_120000_products_bundle_config.up,
+    down: migration_20260808_120000_products_bundle_config.down,
+    name: '20260808_120000_products_bundle_config',
   },
 ];

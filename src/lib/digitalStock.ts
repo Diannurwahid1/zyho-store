@@ -1,5 +1,6 @@
 import type { Media, Order, Product, User } from '@/payload-types'
 import type { BasePayload, PayloadRequest } from 'payload'
+import { expandBundleCartItems } from '@/lib/bundles'
 
 type DigitalStockInput = {
   accountEmail?: string
@@ -138,8 +139,9 @@ export const assignDigitalStockToOrder = async ({
 
   const customerID = normalizeRelationID(customer) || normalizeRelationID((order as Order).customer)
   const deliveries: Record<string, any>[] = []
+  const expandedCartItems = expandBundleCartItems(cartItems)
 
-  for (const item of cartItems) {
+  for (const item of expandedCartItems) {
     const product = item.product as Product | number | string | null | undefined
     const productID = normalizeRelationID(product)
     if (!productID) continue

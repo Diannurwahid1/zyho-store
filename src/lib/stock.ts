@@ -13,6 +13,7 @@
  */
 
 import type { BasePayload } from 'payload'
+import { getNormalizedBundleItems, isBundleProduct } from '@/lib/bundles'
 
 export const RESERVATION_TTL_MINUTES = 10
 
@@ -89,7 +90,20 @@ export async function getAvailableStock(
 
   let inventory = 0
 
-  if (isPerUnitDigitalStockProduct(product)) {
+  if (isBundleProduct(product)) {
+    const bundleItems = getNormalizedBundleItems(product)
+
+    if (bundleItems.length === 0) return 0
+
+    let maxBundles = Number.POSITIVE_INFINITY
+
+    for (const item of bundleItems) {
+      const childAvailable = await getAvailableStock(payload, item.productId, null)
+      maxBundles = Math.min(maxBundles, Math.floor(childAvailable / item.quantity))
+    }
+
+    inventory = Number.isFinite(maxBundles) ? Math.max(0, maxBundles) : 0
+  } else if (isPerUnitDigitalStockProduct(product)) {
     const availableUnits = await payload.find({
       collection: 'digital-stock-units',
       depth: 0,

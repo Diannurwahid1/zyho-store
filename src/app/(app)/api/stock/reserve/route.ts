@@ -1,4 +1,5 @@
 import { findActiveCheckoutSession } from '@/lib/checkoutSessionServer'
+import { getBundleReservationEntries } from '@/lib/bundles'
 import { releaseReservation, reserveStock } from '@/lib/stock'
 import configPromise from '@payload-config'
 import { NextRequest, NextResponse } from 'next/server'
@@ -147,9 +148,33 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const scopedCartItems = items
+      .map((requested) => {
+        const matching = cartItems.find((cartItem: any) => {
+          const productId =
+            typeof cartItem.product === 'object' ? cartItem.product?.id : cartItem.product
+          const variantId =
+            typeof cartItem.variant === 'object' ? cartItem.variant?.id : cartItem.variant
+
+          return (
+            String(productId) === String(requested.productId) &&
+            String(variantId || '') === String(requested.variantId || '')
+          )
+        })
+
+        if (!matching) return null
+
+        return {
+          ...matching,
+          quantity: requested.quantity,
+        }
+      })
+      .filter(Boolean)
+
+    const reservableItems = getBundleReservationEntries(scopedCartItems)
     const results: Array<{ productId: string; success: boolean; error?: string }> = []
 
-    for (const item of items) {
+    for (const item of reservableItems) {
       const reservationKey = `${reservationId}:${item.productId}:${item.variantId || 'base'}`
       const result = await reserveStock(payload, {
         reservationId: reservationKey,
@@ -168,7 +193,7 @@ export async function POST(req: NextRequest) {
 
     if (!allSuccess) {
       // Release semua yang berhasil direservasi karena ada yang gagal
-      for (const item of items) {
+      for (const item of reservableItems) {
         const reservationKey = `${reservationId}:${item.productId}:${item.variantId || 'base'}`
         await releaseReservation(payload, reservationKey, 'Partial reservation rollback')
       }
@@ -224,8 +249,51 @@ export async function DELETE(req: NextRequest) {
       )
     }
 
+    const cartId = activeSession.cartId
+    const cart = cartId
+      ? await payload.findByID({
+          collection: 'carts',
+          depth: 1,
+          id: cartId,
+          overrideAccess: true,
+        })
+      : null
+    const cartItems = Array.isArray((cart as any)?.items) ? (cart as any).items : []
+    const scopedCartItems = items
+      .map((requested) => {
+        const matching = cartItems.find((cartItem: any) => {
+          const productId =
+            typeof cartItem.product === 'object' ? cartItem.product?.id : cartItem.product
+          const variantId =
+            typeof cartItem.variant === 'object' ? cartItem.variant?.id : cartItem.variant
+
+          return (
+            String(productId) === String(requested.productId) &&
+            String(variantId || '') === String(requested.variantId || '')
+          )
+        })
+
+        if (!matching) return null
+
+        return {
+          ...matching,
+          quantity:
+            typeof requested === 'object' && requested && 'quantity' in requested
+              ? Number((requested as any).quantity || matching.quantity || 0)
+              : Number(matching.quantity || 0),
+        }
+      })
+      .filter(Boolean)
+    const releasableItems =
+      scopedCartItems.length > 0
+        ? getBundleReservationEntries(scopedCartItems)
+        : items.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId,
+          }))
+
     let released = 0
-    for (const item of items) {
+    for (const item of releasableItems) {
       const result = await releaseReservation(
         payload,
         `${reservationId}:${item.productId}:${item.variantId || 'base'}`,

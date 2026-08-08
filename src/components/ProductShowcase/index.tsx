@@ -1,15 +1,19 @@
 'use client'
 
 import { DiscountedPrice } from '@/components/DiscountedPrice'
+import { ProductArtwork } from '@/components/product/ProductArtwork'
 import { ProductCardActions } from '@/components/ProductCardActions'
 import { cn } from '@/utilities/cn'
 import { getProductBadgeLabel } from '@/utilities/productBadge'
 import { useCurrency } from '@payloadcms/plugin-ecommerce/client/react'
-import Image from 'next/image'
 import Link from 'next/link'
 import React, { useState } from 'react'
 
 interface ShowcaseProduct {
+  artworkImages?: {
+    alt?: string
+    url: string
+  }[]
   id: number
   title: string
   slug: string
@@ -129,11 +133,13 @@ export const ProductShowcase: React.FC<ProductShowcaseProps> = ({
                   </span>
                 ) : null}
                 <Link href={`/products/${product.slug}`}>
-                  {product.image && (
-                    <div className="relative h-[104px] w-full bg-muted md:h-48">
-                      <Image src={product.image} alt={product.title} fill className="object-cover" />
-                    </div>
-                  )}
+                  <div className="relative h-[104px] w-full bg-muted md:h-48">
+                    <ProductArtwork
+                      alt={product.title}
+                      className="h-full w-full"
+                      images={Array.isArray(product.artworkImages) ? product.artworkImages : []}
+                    />
+                  </div>
                 </Link>
 
                 <div className="p-3 md:p-4">

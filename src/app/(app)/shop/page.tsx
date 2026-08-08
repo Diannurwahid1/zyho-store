@@ -39,6 +39,7 @@ export default async function ShopPage({ searchParams }: Props) {
       shortDescription: true,
       badge: true,
       customBadge: true,
+      bundleConfig: true,
       soldCount: true,
       promo: true,
     },

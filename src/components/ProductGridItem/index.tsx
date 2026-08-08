@@ -1,8 +1,10 @@
 import type { Product } from '@/payload-types'
 
 import { DiscountedPrice } from '@/components/DiscountedPrice'
-import { Media } from '@/components/Media'
+import { ProductArtwork } from '@/components/product/ProductArtwork'
 import { ProductCardActions } from '@/components/ProductCardActions'
+import type { Media as MediaType } from '@/payload-types'
+import { getProductArtworkImages } from '@/lib/productArtwork'
 import { getProductBadgeLabel } from '@/utilities/productBadge'
 import clsx from 'clsx'
 import Link from 'next/link'
@@ -43,7 +45,10 @@ export const ProductGridItem: React.FC<Props> = ({ product }) => {
   }
 
   const image =
-    gallery?.[0]?.image && typeof gallery[0]?.image !== 'string' ? gallery[0]?.image : false
+    gallery?.[0]?.image && typeof gallery[0]?.image === 'object'
+      ? (gallery[0]?.image as MediaType)
+      : null
+  const artworkImages = getProductArtworkImages(product as any, 4)
 
   return (
     <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl md:rounded-3xl">
@@ -59,17 +64,15 @@ export const ProductGridItem: React.FC<Props> = ({ product }) => {
         ) : null}
 
         <Link href={`/products/${product.slug}`}>
-          {image ? (
-            <Media
-              className={clsx('relative aspect-square object-cover md:aspect-[4/3]')}
-              height={360}
-              imgClassName="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-              resource={image}
-              width={480}
+          <div className={clsx('aspect-square md:aspect-[4/3]')}>
+            <ProductArtwork
+              alt={title || 'Product image'}
+              className="h-full w-full transition duration-500 group-hover:scale-[1.02]"
+              images={artworkImages}
+              mediaFallback={image}
+              priority={false}
             />
-          ) : (
-            <div className="aspect-square bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-700 md:aspect-[4/3]" />
-          )}
+          </div>
         </Link>
       </div>
 

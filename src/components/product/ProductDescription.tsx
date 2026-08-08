@@ -7,6 +7,7 @@ import { Price } from '@/components/Price'
 import { RichText } from '@/components/RichText'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { getNormalizedBundleItems } from '@/lib/bundles'
 import { gaViewItem } from '@/utilities/googleAnalytics'
 import { getProductBadgeLabel } from '@/utilities/productBadge'
 import Link from 'next/link'
@@ -27,6 +28,7 @@ export function ProductDescription({ product }: { product: Product }) {
   const hasRefundPolicy = normalizedRefundPolicy.length > 0
   const requiresPolicyConsent = hasUpdatePolicy || hasRefundPolicy
   const [policyChecked, setPolicyChecked] = useState(!requiresPolicyConsent)
+  const bundleItems = useMemo(() => getNormalizedBundleItems(product as any), [product])
   let amount = 0,
     lowestAmount = 0,
     highestAmount = 0
@@ -98,6 +100,31 @@ export function ProductDescription({ product }: { product: Product }) {
         <h1 className="text-3xl font-semibold tracking-tight md:text-5xl">{product.title}</h1>
         {product.shortDescription ? (
           <p className="text-lg leading-8 text-muted-foreground">{product.shortDescription}</p>
+        ) : null}
+        {bundleItems.length > 0 ? (
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
+              Bundle termasuk
+            </p>
+            <div className="mt-3 grid gap-2">
+              {bundleItems.map((item) => (
+                <div
+                  key={`${item.productId}-${item.quantity}-${item.discountPercent}`}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/80 px-4 py-3"
+                >
+                  <div>
+                    <p className="font-medium">
+                      {item.product?.title || `Produk #${String(item.productId)}`}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Qty {item.quantity}</p>
+                  </div>
+                  <div className="rounded-full bg-emerald-500/10 px-3 py-1 text-sm font-semibold text-emerald-600">
+                    -{item.discountPercent}%
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         ) : null}
         <div className="text-3xl font-semibold">
           {hasVariants ? (

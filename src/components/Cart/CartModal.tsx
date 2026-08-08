@@ -3,6 +3,7 @@
 import { DiscountedPrice } from '@/components/DiscountedPrice'
 import { LocalizedPrice } from '@/components/LocalizedPrice'
 import { Price } from '@/components/Price'
+import { ProductArtwork } from '@/components/product/ProductArtwork'
 import { useActiveVouchers } from '@/providers/ActiveVouchers'
 import {
     Sheet,
@@ -20,6 +21,7 @@ import { usePathname } from 'next/navigation'
 import React, { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { getProductArtworkImages } from '@/lib/productArtwork'
 import { Product } from '@/payload-types'
 import { DeleteItemButton } from './DeleteItemButton'
 import { EditItemQuantityButton } from './EditItemQuantityButton'
@@ -256,15 +258,12 @@ export function CartModal({ trigger }: { trigger?: React.ReactNode }) {
                           href={`/products/${(item.product as Product)?.slug}`}
                         >
                           <div className="relative h-16 w-16 cursor-pointer overflow-hidden rounded-md border border-neutral-300 bg-neutral-300 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800">
-                            {image?.url && (
-                              <Image
-                                alt={image?.alt || product?.title || ''}
-                                className="h-full w-full object-cover"
-                                height={94}
-                                src={image.url}
-                                width={94}
-                              />
-                            )}
+                            <ProductArtwork
+                              alt={product?.title || ''}
+                              className="h-full w-full"
+                              images={getProductArtworkImages(product as any, 4)}
+                              mediaFallback={image || null}
+                            />
                           </div>
 
                           <div className="flex flex-1 flex-col text-base">

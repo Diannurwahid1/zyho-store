@@ -5,6 +5,7 @@ import {
     getCartItemUnitPrice,
 } from '@/lib/buyNow'
 import { assertOwnedActiveCheckoutSession } from '@/lib/checkoutSessionServer'
+import { getBundleReservationEntries } from '@/lib/bundles'
 import { assignDigitalStockToOrder } from '@/lib/digitalStock'
 import { confirmStockReservation } from '@/lib/stock'
 import {
@@ -459,13 +460,9 @@ export const finalizePaidOrder = async ({
   }
 
   if (cartID) {
-    for (const item of cartItems) {
-      const productId = typeof item.product === 'object' ? item.product?.id : item.product
-      const variantId = item.variant
-        ? typeof item.variant === 'object'
-          ? item.variant?.id
-          : item.variant
-        : 'base'
+    for (const item of getBundleReservationEntries(cartItems)) {
+      const productId = item.productId
+      const variantId = item.variantId || 'base'
 
       if (!productId) continue
 

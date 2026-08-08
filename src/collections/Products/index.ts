@@ -1,6 +1,12 @@
 import { CallToAction } from '@/blocks/CallToAction/config'
 import { Content } from '@/blocks/Content/config'
 import { MediaBlock } from '@/blocks/MediaBlock/config'
+import {
+  calculateBundleAvailability,
+  calculateBundleUnitPrice,
+  getNormalizedBundleItems,
+  isBundleProduct,
+} from '@/lib/bundles'
 import { generatePreviewPath } from '@/utilities/generatePreviewPath'
 import { validateDualCurrencyPricing } from '@/utilities/validateDualCurrencyPricing'
 import { CollectionOverride } from '@payloadcms/plugin-ecommerce/types'
@@ -21,6 +27,63 @@ import {
 import { DefaultDocumentIDType, slugField, Where } from 'payload'
 
 const STAFF_ROLES = new Set(['admin', 'manager', 'finance', 'support'])
+
+type BundleConfigInputItem = {
+  discountPercent: number
+  productId: number
+  quantity: number
+}
+
+const normalizeBundleConfigInput = (value: unknown) => {
+  if (!value || typeof value !== 'object') return null
+
+  const raw = value as {
+    enabled?: unknown
+    items?: unknown
+  }
+
+  const items: BundleConfigInputItem[] = Array.isArray(raw.items)
+    ? raw.items
+        .map((item) => {
+          if (!item || typeof item !== 'object') return null
+
+          const row = item as {
+            discountPercent?: unknown
+            product?: unknown
+            productId?: unknown
+            quantity?: unknown
+          }
+
+          const productValue =
+            typeof row.product === 'object' && row.product && 'id' in row.product
+              ? (row.product as { id?: unknown }).id
+              : row.product
+
+          const productId = Number(row.productId ?? productValue)
+          if (!Number.isFinite(productId) || productId <= 0) return null
+
+          const quantity = Math.max(1, Math.floor(Number(row.quantity || 1) || 1))
+          const discountPercent = Math.min(
+            100,
+            Math.max(0, Number(row.discountPercent || 0) || 0),
+          )
+
+          return {
+            discountPercent,
+            productId,
+            quantity,
+          }
+        })
+        .filter((item): item is BundleConfigInputItem => Boolean(item))
+    : []
+
+  if (items.length === 0) return null
+
+  return {
+    enabled: raw.enabled !== false,
+    items,
+  }
+}
 
 const shouldUseManualSoldCountOnly = (req: any) => {
   const roles = Array.isArray(req?.user?.roles) ? req.user.roles : []
@@ -114,6 +177,15 @@ const getPerUnitInventoryCache = async (req: any) => {
   return cache
 }
 
+const getBundleProductCache = async (req: any) => {
+  if (!req?.context) req.context = {}
+  if (!req.context.bundleProductCache) {
+    req.context.bundleProductCache = new Map<string, any>()
+  }
+
+  return req.context.bundleProductCache as Map<string, any>
+}
+
 export const ProductsCollection: CollectionOverride = ({ defaultCollection }) => ({
   ...defaultCollection,
   hooks: {
@@ -155,6 +227,62 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
           }
         }
 
+        if (nextDoc.bundleConfig && req?.payload) {
+          const normalizedBundle = normalizeBundleConfigInput(nextDoc.bundleConfig)
+
+          if (normalizedBundle?.items?.length) {
+            const bundleCache = await getBundleProductCache(req)
+            const enrichedItems = []
+
+            for (const item of normalizedBundle.items) {
+              const cacheKey = String(item.productId)
+              let bundleProduct = bundleCache.get(cacheKey)
+
+              if (!bundleProduct) {
+                bundleProduct = await req.payload.findByID({
+                  collection: 'products',
+                  id: item.productId,
+                  depth: 1,
+                  overrideAccess: true,
+                  req,
+                })
+                bundleCache.set(cacheKey, bundleProduct)
+              }
+
+              if (!bundleProduct || String(bundleProduct.id) === String(nextDoc.id)) continue
+
+              enrichedItems.push({
+                ...item,
+                product: bundleProduct,
+              })
+            }
+
+            if (enrichedItems.length > 0) {
+              nextDoc.bundleConfig = {
+                enabled: true,
+                items: enrichedItems,
+              }
+
+              if (isBundleProduct(nextDoc)) {
+                nextDoc.priceInIDR = calculateBundleUnitPrice(
+                  nextDoc,
+                  'IDR',
+                  typeof nextDoc.priceInIDR === 'number' ? nextDoc.priceInIDR : 0,
+                )
+                nextDoc.priceInUSD = calculateBundleUnitPrice(
+                  nextDoc,
+                  'USD',
+                  typeof nextDoc.priceInUSD === 'number' ? nextDoc.priceInUSD : 0,
+                )
+                nextDoc.inventory = calculateBundleAvailability(
+                  nextDoc,
+                  typeof nextDoc.inventory === 'number' ? nextDoc.inventory : 0,
+                )
+              }
+            }
+          }
+        }
+
         if (shouldUseManualSoldCountOnly(req)) return nextDoc
 
         const soldCountByProduct = await getSoldCountCache(req)
@@ -167,6 +295,51 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
     ],
     beforeChange: [
       ...(defaultCollection.hooks?.beforeChange || []),
+      async ({ data, req, originalDoc }) => {
+        if (!data || typeof data !== 'object') return data
+
+        const nextData = { ...data } as any
+        const normalizedBundle = normalizeBundleConfigInput(nextData.bundleConfig)
+
+        if (!normalizedBundle) {
+          nextData.bundleConfig = null
+          return nextData
+        }
+
+        const currentProductId =
+          nextData.id ||
+          (originalDoc && typeof originalDoc === 'object' && 'id' in originalDoc
+            ? (originalDoc as { id?: unknown }).id
+            : null)
+
+        for (const item of normalizedBundle.items) {
+          if (currentProductId && String(item.productId) === String(currentProductId)) {
+            throw new Error('Bundle tidak boleh berisi produk itu sendiri.')
+          }
+
+          const bundleChild = await req.payload.findByID({
+            collection: 'products',
+            id: item.productId,
+            depth: 0,
+            overrideAccess: true,
+            req,
+          })
+
+          if (!bundleChild) {
+            throw new Error(`Produk bundle ${item.productId} tidak ditemukan.`)
+          }
+
+          const childBundle = normalizeBundleConfigInput((bundleChild as any).bundleConfig)
+          if (childBundle?.items?.length) {
+            throw new Error(
+              `Produk "${(bundleChild as any).title || item.productId}" sudah berupa bundle. Nested bundle belum didukung.`,
+            )
+          }
+        }
+
+        nextData.bundleConfig = normalizedBundle
+        return nextData
+      },
       (args) => validateDualCurrencyPricing(args, 'Produk'),
     ],
   },
@@ -208,6 +381,7 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
     inventory: true,
     soldCount: true,
     customBadge: true,
+    bundleConfig: true,
     meta: true,
   },
   fields: [
@@ -444,6 +618,18 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
               min: 0,
               admin: {
                 description: 'Jumlah produk yang sudah terjual. Bisa diinput manual untuk ditampilkan di storefront.',
+              },
+            },
+            {
+              name: 'bundleConfig',
+              type: 'json',
+              label: 'Bundle Config',
+              admin: {
+                components: {
+                  Field: '@/collections/Products/BundleConfigField#BundleConfigField',
+                },
+                description:
+                  'Pilih produk yang ingin digabung dan atur diskon masing-masing item bundle.',
               },
             },
             {

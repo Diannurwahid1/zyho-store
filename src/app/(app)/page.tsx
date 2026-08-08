@@ -6,6 +6,7 @@ import { PromoBanner } from '@/components/PromoBanner'
 import { PromoSection } from '@/components/PromoSection'
 import { Testimonials } from '@/components/Testimonials'
 import { homeStaticData } from '@/endpoints/seed/home-static'
+import { getProductArtworkImages } from '@/lib/productArtwork'
 import { generateMeta } from '@/utilities/generateMeta'
 import { getClientLanguage } from '@/utilities/getClientLanguage'
 import { sortProducts } from '@/utilities/sortProducts'
@@ -106,6 +107,7 @@ export default async function Page() {
   const showcaseProducts = products.map((product) => {
     const firstImage = product.gallery?.[0]
     const imageUrl = typeof firstImage?.image === 'object' ? firstImage.image.url : ''
+    const artworkImages = getProductArtworkImages(product as any, 4)
 
     return {
       id: product.id,
@@ -126,6 +128,7 @@ export default async function Page() {
           inventory: variant.inventory,
         })),
       image: imageUrl || '',
+      artworkImages,
       description:
         product.shortDescription ||
         (language === 'id'

@@ -3,8 +3,11 @@ import type { Media, Product } from '@/payload-types'
 import { RenderBlocks } from '@/blocks/RenderBlocks'
 import { GridTileImage } from '@/components/Grid/tile'
 import { Gallery } from '@/components/product/Gallery'
+import { ProductArtwork } from '@/components/product/ProductArtwork'
 import { PolicyCard } from '@/components/product/PolicyCard'
 import { ProductDescription } from '@/components/product/ProductDescription'
+import { getNormalizedBundleItems } from '@/lib/bundles'
+import { getProductArtworkImages } from '@/lib/productArtwork'
 import { Button } from '@/components/ui/button'
 import { getCachedCurrencySettings } from '@/utilities/currencySettings'
 import { getClientLanguage } from '@/utilities/getClientLanguage'
@@ -93,6 +96,8 @@ export default async function ProductPage({ params }: Args) {
         ...item,
         image: item.image as Media,
       })) || []
+  const bundleArtworkImages = getProductArtworkImages(product as any, 4)
+  const bundleItems = getNormalizedBundleItems(product as any)
 
   const metaImage = typeof product.meta?.image === 'object' ? product.meta?.image : undefined
   const hasStock = product.enableVariants
@@ -157,7 +162,65 @@ export default async function ProductPage({ params }: Args) {
                 <div className="relative aspect-square h-full max-h-[550px] w-full overflow-hidden" />
               }
             >
-              {Boolean(gallery?.length) && <Gallery gallery={gallery} />}
+              {bundleArtworkImages.length > 1 ? (
+                <div className="space-y-4">
+                  <div className="relative aspect-square w-full overflow-hidden rounded-[1.75rem] border bg-card shadow-sm">
+                    <ProductArtwork
+                      alt={product.title}
+                      className="h-full w-full"
+                      images={bundleArtworkImages}
+                      mediaFallback={metaImage || null}
+                      priority
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {bundleItems.map((item) => {
+                      const childImages = getProductArtworkImages(item.product, 1)
+                      const childImage = childImages[0]
+
+                      return (
+                        <div
+                          key={`${item.productId}-${item.quantity}-${item.discountPercent}`}
+                          className="rounded-2xl border bg-background p-3"
+                        >
+                          <div className="relative mb-3 aspect-[4/3] overflow-hidden rounded-xl border bg-muted">
+                            <ProductArtwork
+                              alt={item.product?.title || product.title}
+                              className="h-full w-full"
+                              images={childImages}
+                              priority={false}
+                            />
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold">
+                                {item.product?.title || `Produk #${String(item.productId)}`}
+                              </p>
+                              <p className="text-xs text-muted-foreground">Qty {item.quantity}</p>
+                            </div>
+                            <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600">
+                              -{item.discountPercent}%
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : Boolean(gallery?.length) ? (
+                <Gallery gallery={gallery} />
+              ) : (
+                <div className="relative aspect-square w-full overflow-hidden rounded-[1.75rem] border bg-card shadow-sm">
+                  <ProductArtwork
+                    alt={product.title}
+                    className="h-full w-full"
+                    images={bundleArtworkImages}
+                    mediaFallback={metaImage || null}
+                    priority
+                  />
+                </div>
+              )}
             </Suspense>
           </div>
 
