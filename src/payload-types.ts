@@ -363,6 +363,7 @@ export interface Order {
   subtotalBeforeDiscount?: number | null;
   discountAmount?: number | null;
   memberTierSnapshot?: ('bronze' | 'silver' | 'gold' | 'diamond') | null;
+  orderChannel?: string | null;
   /**
    * Snapshot hasil assignment stok digital per unit. Customer hanya melihat data miliknya dari order ini.
    */
@@ -503,6 +504,9 @@ export interface Product {
   refundPolicy?: string | null;
   isFeatured?: boolean | null;
   badge?: ('new' | 'best_seller' | 'discount') | null;
+  /**
+   * Isi badge custom manual untuk storefront. Jika diisi, badge ini akan menggantikan badge preset.
+   */
   customBadge?: string | null;
   /**
    * Jumlah produk yang sudah terjual. Bisa diinput manual untuk ditampilkan di storefront.
@@ -521,6 +525,32 @@ export interface Product {
     hasNextPage?: boolean;
     totalDocs?: number;
   };
+  /**
+   * Pilih produk yang ingin digabung dan atur diskon masing-masing item bundle.
+   */
+  bundle?: {
+    enabled?: boolean | null;
+    /**
+     * Tambahkan produk yang masuk dalam bundle ini. Harga dihitung dari harga produk dikurangi diskon per item.
+     */
+    items?:
+      | {
+          product: number | Product;
+          quantity: number;
+          discountPercent: number;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  bundleConfig?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   promo?: {
     isFlashSale?: boolean | null;
     /**
@@ -1180,6 +1210,15 @@ export interface DigitalStockUnit {
   customer?: (number | null) | User;
   order?: (number | null) | Order;
   assignedAt?: string | null;
+  redeemEnabled?: boolean | null;
+  /**
+   * Kode redeem unik untuk customer. Sekali berhasil dipakai, unit ini langsung masuk order gift redeem.
+   */
+  redeemCode?: string | null;
+  redeemCodeLookup?: string | null;
+  redeemedBy?: (number | null) | User;
+  redeemOrder?: (number | null) | Order;
+  redeemedAt?: string | null;
   notes?: string | null;
   updatedAt: string;
   createdAt: string;
@@ -2371,6 +2410,12 @@ export interface DigitalStockUnitsSelect<T extends boolean = true> {
   customer?: T;
   order?: T;
   assignedAt?: T;
+  redeemEnabled?: T;
+  redeemCode?: T;
+  redeemCodeLookup?: T;
+  redeemedBy?: T;
+  redeemOrder?: T;
+  redeemedAt?: T;
   notes?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -2968,6 +3013,20 @@ export interface ProductsSelect<T extends boolean = true> {
   soldCount?: T;
   digitalAssets?: T;
   digitalStockUnits?: T;
+  bundle?:
+    | T
+    | {
+        enabled?: T;
+        items?:
+          | T
+          | {
+              product?: T;
+              quantity?: T;
+              discountPercent?: T;
+              id?: T;
+            };
+      };
+  bundleConfig?: T;
   promo?:
     | T
     | {
@@ -3065,6 +3124,7 @@ export interface OrdersSelect<T extends boolean = true> {
   subtotalBeforeDiscount?: T;
   discountAmount?: T;
   memberTierSnapshot?: T;
+  orderChannel?: T;
   digitalDeliveries?:
     | T
     | {

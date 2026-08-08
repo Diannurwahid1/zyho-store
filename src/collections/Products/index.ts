@@ -227,10 +227,13 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
           }
         }
 
-        if (nextDoc.bundleConfig && req?.payload) {
-          const normalizedBundle = normalizeBundleConfigInput(nextDoc.bundleConfig)
+        const normalizedNativeBundle = normalizeBundleConfigInput(nextDoc.bundle)
+        const normalizedStoredBundle = normalizeBundleConfigInput(nextDoc.bundleConfig)
+        const normalizedBundle = normalizedNativeBundle || normalizedStoredBundle
 
-          if (normalizedBundle?.items?.length) {
+        if (normalizedBundle && req?.payload) {
+
+          if (normalizedBundle.items.length) {
             const bundleCache = await getBundleProductCache(req)
             const enrichedItems = []
 
@@ -299,7 +302,8 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
         if (!data || typeof data !== 'object') return data
 
         const nextData = { ...data } as any
-        const normalizedBundle = normalizeBundleConfigInput(nextData.bundleConfig)
+        const normalizedBundle =
+          normalizeBundleConfigInput(nextData.bundle) || normalizeBundleConfigInput(nextData.bundleConfig)
 
         if (!normalizedBundle) {
           nextData.bundleConfig = null
@@ -381,6 +385,7 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
     inventory: true,
     soldCount: true,
     customBadge: true,
+    bundle: true,
     bundleConfig: true,
     meta: true,
   },
@@ -649,16 +654,68 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
           label: 'Promo & Flash Sale',
           fields: [
             {
-              name: 'bundleBuilder',
-              type: 'ui',
+              name: 'bundle',
+              type: 'group',
               label: 'Bundle Produk',
               admin: {
-                components: {
-                  Field: '@/collections/Products/BundleConfigField#BundleConfigField',
-                },
                 description:
                   'Pilih produk yang ingin digabung dan atur diskon masing-masing item bundle.',
               },
+              fields: [
+                {
+                  name: 'enabled',
+                  type: 'checkbox',
+                  defaultValue: false,
+                  label: 'Aktifkan bundle untuk produk ini',
+                },
+                {
+                  name: 'items',
+                  type: 'array',
+                  admin: {
+                    condition: (_, siblingData) => siblingData?.enabled,
+                    description:
+                      'Tambahkan produk yang masuk dalam bundle ini. Harga dihitung dari harga produk dikurangi diskon per item.',
+                  },
+                  fields: [
+                    {
+                      name: 'product',
+                      type: 'relationship',
+                      relationTo: 'products',
+                      required: true,
+                      filterOptions: ({ id }) => {
+                        if (!id) return true
+
+                        return {
+                          id: {
+                            not_equals: id,
+                          },
+                        }
+                      },
+                    },
+                    {
+                      name: 'quantity',
+                      type: 'number',
+                      defaultValue: 1,
+                      min: 1,
+                      required: true,
+                      label: 'Qty di bundle',
+                    },
+                    {
+                      name: 'discountPercent',
+                      type: 'number',
+                      defaultValue: 0,
+                      min: 0,
+                      max: 100,
+                      required: true,
+                      label: 'Diskon produk (%)',
+                    },
+                  ],
+                  labels: {
+                    plural: 'Produk Bundle',
+                    singular: 'Produk Bundle',
+                  },
+                },
+              ],
             },
             {
               name: 'bundleConfig',

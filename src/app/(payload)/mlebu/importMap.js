@@ -27,7 +27,6 @@ import { PriceCell as PriceCell_e27bf7b8cc50640dcdd584767b8eac3c } from '@payloa
 import { PriceInput as PriceInput_b91672ccd6e8b071c11142ab941fedfb } from '@payloadcms/plugin-ecommerce/rsc'
 import { DuplicateProductCell as DuplicateProductCell_95a0f842baaf77c4aa11551c23c23e1d } from '@/collections/Products/DuplicateProductCell'
 import { HorizontalRuleFeatureClient as HorizontalRuleFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
-import { BundleConfigField as BundleConfigField_e9e646e740f8181c2c0597312ad8db70 } from '@/collections/Products/BundleConfigField'
 import { StockAdjustmentField as StockAdjustmentField_69bcdc318895da7bd33ec1752c355dd2 } from '@/components/StockAdjustmentField'
 import { AdminWhatsAppBlastField as AdminWhatsAppBlastField_d46d3fee865d91c666180ff549d69792 } from '@/components/AdminWhatsAppBlastField'
 import { Icon as Icon_a0bd5f2fa532ef2166f77171a2b9828a } from '@/components/Logo/Logo'
@@ -68,7 +67,6 @@ export const importMap = {
   "@payloadcms/plugin-ecommerce/rsc#PriceInput": PriceInput_b91672ccd6e8b071c11142ab941fedfb,
   "@/collections/Products/DuplicateProductCell#DuplicateProductCell": DuplicateProductCell_95a0f842baaf77c4aa11551c23c23e1d,
   "@payloadcms/richtext-lexical/client#HorizontalRuleFeatureClient": HorizontalRuleFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
-  "@/collections/Products/BundleConfigField#BundleConfigField": BundleConfigField_e9e646e740f8181c2c0597312ad8db70,
   "@/components/StockAdjustmentField#StockAdjustmentField": StockAdjustmentField_69bcdc318895da7bd33ec1752c355dd2,
   "@/components/AdminWhatsAppBlastField#AdminWhatsAppBlastField": AdminWhatsAppBlastField_d46d3fee865d91c666180ff549d69792,
   "@/components/Logo/Logo#Icon": Icon_a0bd5f2fa532ef2166f77171a2b9828a,
