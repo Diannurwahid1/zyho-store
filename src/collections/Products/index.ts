@@ -621,15 +621,22 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
               },
             },
             {
-              name: 'bundleConfig',
-              type: 'json',
-              label: 'Bundle Config',
+              name: 'bundleBuilder',
+              type: 'ui',
+              label: 'Bundle Produk',
               admin: {
                 components: {
                   Field: '@/collections/Products/BundleConfigField#BundleConfigField',
                 },
                 description:
                   'Pilih produk yang ingin digabung dan atur diskon masing-masing item bundle.',
+              },
+            },
+            {
+              name: 'bundleConfig',
+              type: 'json',
+              admin: {
+                hidden: true,
               },
             },
             {
