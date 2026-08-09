@@ -18,6 +18,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 interface Product {
+  bundleConfig?: {
+    enabled?: boolean | null
+    items?: unknown[] | null
+  } | null
   digitalFulfillmentMode?: 'standard' | 'per_unit_stock' | null
   id: string
   inventory?: number
@@ -62,6 +66,9 @@ const createEmptyUnit = (): DigitalUnitDraft => ({
   loginUrl: '',
   referenceCode: '',
 })
+
+const isBundleProductRow = (product: Product) =>
+  Boolean(product.bundleConfig?.enabled && product.bundleConfig.items?.length)
 
 const panelStyle: React.CSSProperties = {
   background:
@@ -583,24 +590,34 @@ export const StockAdjustmentField: React.FC = () => {
                     <td style={{ padding: '0.75rem', textAlign: 'center' }}>
                       <span
                         style={
-                          product.digitalFulfillmentMode === 'per_unit_stock'
+                          isBundleProductRow(product)
+                            ? badgeStyle('default')
+                            : product.digitalFulfillmentMode === 'per_unit_stock'
                             ? badgeStyle('success')
                             : badgeStyle('warning')
                         }
                       >
-                        {product.digitalFulfillmentMode === 'per_unit_stock'
+                        {isBundleProductRow(product)
+                          ? 'Bundle mengikuti produk'
+                          : product.digitalFulfillmentMode === 'per_unit_stock'
                           ? 'Per-unit stock'
                           : 'Standard'}
                       </span>
                     </td>
                     <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                      <Button
-                        size="sm"
-                        onClick={() => openAdjustmentModal(product, product.inventory || 0)}
-                      >
-                        <Plus className="mr-1 h-4 w-4" />
-                        Kelola Stok
-                      </Button>
+                      {isBundleProductRow(product) ? (
+                        <span style={{ color: 'var(--theme-text-dimmed)', fontSize: '0.8rem' }}>
+                          Kelola stok produk isi bundle
+                        </span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => openAdjustmentModal(product, product.inventory || 0)}
+                        >
+                          <Plus className="mr-1 h-4 w-4" />
+                          Kelola Stok
+                        </Button>
+                      )}
                     </td>
                   </tr>
 

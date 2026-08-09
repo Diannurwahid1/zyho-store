@@ -264,6 +264,15 @@ export const ProductsCollection: CollectionOverride = ({ defaultCollection }) =>
                     bundleConfig: true,
                   },
                 })
+
+                if (bundleProduct?.digitalFulfillmentMode === 'per_unit_stock') {
+                  const inventoryCache = await getPerUnitInventoryCache(req)
+                  bundleProduct = {
+                    ...bundleProduct,
+                    inventory: inventoryCache.byProduct[cacheKey] || 0,
+                  }
+                }
+
                 bundleCache.set(cacheKey, bundleProduct)
               }
 
