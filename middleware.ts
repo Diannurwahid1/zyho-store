@@ -1,40 +1,28 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
-
-// Enable maintenance mode via environment variable
-const MAINTENANCE_MODE = process.env.MAINTENANCE_MODE === 'true'
+import { isMaintenanceModeEnabled } from '@/lib/maintenance'
 
 export async function middleware(request: NextRequest) {
-  if (!MAINTENANCE_MODE) {
+  if (!isMaintenanceModeEnabled()) {
     return NextResponse.next()
   }
 
   const pathname = request.nextUrl.pathname
-  
-  // Allow access to maintenance page itself
-  if (pathname === '/maintenance' || pathname.startsWith('/maintenance/')) {
-    return NextResponse.next()
-  }
-  
-  // Allow access to admin panel (mlebu)
-  if (pathname.startsWith('/mlebu') || pathname.startsWith('/admin')) {
-    return NextResponse.next()
-  }
-  
-  // Allow access to all API routes
-  if (pathname.startsWith('/api/')) {
-    return NextResponse.next()
-  }
-  
-  // Allow static assets
-  if (pathname.startsWith('/_next/static') || 
-      pathname.startsWith('/_next/image') ||
-      pathname === '/favicon.ico' ||
-      pathname === '/media/maintenance.png') {
+  const isAllowedPath =
+    pathname === '/maintenance' ||
+    pathname.startsWith('/maintenance/') ||
+    pathname.startsWith('/mlebu') ||
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/_next/static') ||
+    pathname.startsWith('/_next/image') ||
+    pathname === '/favicon.ico' ||
+    pathname === '/media/maintenance.png'
+
+  if (isAllowedPath) {
     return NextResponse.next()
   }
 
-  // Redirect all other traffic to maintenance page
   return NextResponse.redirect(new URL('/maintenance', request.url))
 }
 

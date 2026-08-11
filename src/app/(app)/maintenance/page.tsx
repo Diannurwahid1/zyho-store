@@ -17,7 +17,6 @@ export default function MaintenancePage() {
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gray-50 p-4">
       <div className="max-w-4xl mx-auto text-center">
-        {/* Logo */}
         <div className="mb-8">
           <Image
             src="/media/maintenance.png"
@@ -63,9 +62,8 @@ export default function MaintenancePage() {
         </Link>
       </div>
 
-      {/* Footer */}
       <div className="mt-auto pt-8 text-center text-sm text-gray-400">
-        <p>© {new Date().getFullYear()} Zyho Store. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Zyho Store. All rights reserved.</p>
       </div>
     </div>
   )
