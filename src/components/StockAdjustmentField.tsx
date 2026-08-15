@@ -408,6 +408,50 @@ export const StockAdjustmentField: React.FC = () => {
     }
   }
 
+  const handleDownloadExcelTemplate = async () => {
+    try {
+      const XLSX = await import('xlsx')
+      const rows = [
+        {
+          label: 'Slot 1',
+          email: 'customer-account@example.com',
+          username: 'username_akun',
+          password: 'password_akun',
+          login_url: 'https://example.com/login',
+          reference_code: 'BATCH-A-001',
+          notes: 'Catatan tambahan opsional',
+        },
+        {
+          label: 'Slot 2',
+          email: '',
+          username: '',
+          password: '',
+          login_url: '',
+          reference_code: '',
+          notes: '',
+        },
+      ]
+      const worksheet = XLSX.utils.json_to_sheet(rows, {
+        header: ['label', 'email', 'username', 'password', 'login_url', 'reference_code', 'notes'],
+      })
+      worksheet['!cols'] = [
+        { wch: 18 },
+        { wch: 32 },
+        { wch: 24 },
+        { wch: 24 },
+        { wch: 32 },
+        { wch: 22 },
+        { wch: 36 },
+      ]
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'credentials')
+      XLSX.writeFile(workbook, 'template-import-stok-credentials.xlsx')
+    } catch (err) {
+      console.error('[StockAdjustment] Failed to download Excel template', err)
+      toast.error('Gagal membuat template Excel.')
+    }
+  }
+
   const handleAdjustment = async () => {
     const quantity = Number.parseInt(adjustmentForm.quantity, 10)
     if (Number.isNaN(quantity) || quantity === 0) {
@@ -1193,7 +1237,7 @@ export const StockAdjustmentField: React.FC = () => {
                         }}
                       >
                         <strong>Isi quantity positif dulu, atau import dari Excel.</strong>
-                        <div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                           <input
                             ref={importFileRef}
                             accept=".xlsx,.xls,.csv"
@@ -1213,6 +1257,15 @@ export const StockAdjustmentField: React.FC = () => {
                               <Upload className="h-4 w-4" />
                             )}
                             Import Excel
+                          </Button>
+                          <Button
+                            disabled={isImportingExcel || adjusting}
+                            onClick={() => void handleDownloadExcelTemplate()}
+                            type="button"
+                            variant="outline"
+                          >
+                            <FileSpreadsheet className="h-4 w-4" />
+                            Template Excel
                           </Button>
                         </div>
                       </div>
@@ -1315,6 +1368,15 @@ export const StockAdjustmentField: React.FC = () => {
                               <Upload className="h-4 w-4" />
                             )}
                             Import Excel
+                          </Button>
+                          <Button
+                            disabled={isImportingExcel || adjusting}
+                            onClick={() => void handleDownloadExcelTemplate()}
+                            type="button"
+                            variant="outline"
+                          >
+                            <FileSpreadsheet className="h-4 w-4" />
+                            Template Excel
                           </Button>
                         </div>
                       </div>
