@@ -72,18 +72,6 @@ export const createDigitalStockUnits = async ({
 
   for (const entry of entries) {
     const deliveryType = entry.deliveryType || 'credentials'
-    const hasCredentials =
-      Boolean(entry.accountEmail?.trim()) ||
-      Boolean(entry.accountUsername?.trim()) ||
-      Boolean(entry.accountPassword?.trim())
-    const hasFile = Boolean(entry.fileId)
-    const hasText = Boolean(entry.content?.trim()) || Boolean(entry.referenceCode?.trim())
-
-    if (!hasCredentials && !hasFile && !hasText) {
-      throw new Error(
-        'Setiap stok digital harus punya minimal email/username/password, file, atau catatan.',
-      )
-    }
 
     const createdUnit = await payload.create({
       collection: 'digital-stock-units',

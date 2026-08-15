@@ -339,9 +339,9 @@ export const plugins: Plugin[] = [
     payments: {
       paymentMethods: [
         pakasirAdapter({
-          apiKey: process.env.PAKASIR_API_KEY!,
-          projectSlug: process.env.PAKASIR_PROJECT_SLUG!,
-          isSandbox: process.env.PAKASIR_SANDBOX === 'true',
+          apiKey: process.env.SUMOPOD_API_KEY!,
+          isSandbox: process.env.SUMOPOD_SANDBOX !== 'false',
+          projectSlug: 'sumopod',
         }),
         nowpaymentsAdapter({
           apiKey: process.env.NOWPAYMENTS_API_KEY!,

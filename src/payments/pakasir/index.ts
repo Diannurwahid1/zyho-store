@@ -15,9 +15,11 @@ export interface PakasirAdapterConfig {
 }
 
 export const pakasirAdapter = (config: PakasirAdapterConfig): PaymentAdapter => {
+  void config
+
   return {
     name: 'pakasir',
-    label: 'Pakasir',
+    label: 'SumoPod QRIS',
     group: {
       name: 'pakasir',
       type: 'group',
@@ -28,7 +30,7 @@ export const pakasirAdapter = (config: PakasirAdapterConfig): PaymentAdapter => 
         {
           name: 'pakasirOrderID',
           type: 'text',
-          label: 'Pakasir Order ID',
+          label: 'SumoPod Order ID',
           unique: true,
         },
       ],
@@ -60,7 +62,7 @@ export const pakasirAdapter = (config: PakasirAdapterConfig): PaymentAdapter => 
 
       req.payload.logger.info(
         { paymentIntentID, customerEmail: rawData?.customerEmail, cartID: rawData?.cartID },
-        '[Pakasir] confirmOrder called',
+        '[SumoPod] confirmOrder called',
       )
 
       const existing = await findFinalizedPayment({
@@ -92,7 +94,7 @@ export const pakasirAdapter = (config: PakasirAdapterConfig): PaymentAdapter => 
         const order = existingOrder.docs[0] as any
         req.payload.logger.info(
           { orderID: order.id, paymentReference: context.paymentReference },
-          '[Pakasir] Order already exists, skipping creation',
+          '[SumoPod] Order already exists, skipping creation',
         )
         return {
           accessToken: order.accessToken,
@@ -103,24 +105,29 @@ export const pakasirAdapter = (config: PakasirAdapterConfig): PaymentAdapter => 
         }
       }
 
-      if (!config.isSandbox) {
-        try {
-          const verifyUrl = `https://app.pakasir.com/api/transactiondetail?project=${config.projectSlug}&amount=${context.amount}&order_id=${paymentIntentID}&api_key=${config.apiKey}`
-          const verifyRes = await fetch(verifyUrl)
-          const verifyData = await verifyRes.json()
-          const txStatus = verifyData?.transaction?.status
+      const checkoutSession = await req.payload.find({
+        collection: 'checkout-sessions' as any,
+        depth: 0,
+        limit: 1,
+        overrideAccess: true,
+        req,
+        where: {
+          sessionId: { equals: context.checkoutSessionID },
+        } as any,
+      })
+      const paymentData = checkoutSession.docs[0]?.paymentData as Record<string, any> | undefined
+      const sumopodStatus = String(paymentData?.sumopodStatus || '').toLowerCase()
 
-          req.payload.logger.info({ txStatus }, '[Pakasir] verify status')
-
-          if (txStatus && txStatus !== 'completed') {
-            throw new Error(`Pembayaran belum selesai. Status: ${txStatus}`)
-          }
-        } catch (err: any) {
-          req.payload.logger.error({ err }, '[Pakasir] Gagal verifikasi status')
-          throw err
-        }
-      } else {
-        req.payload.logger.info('[Pakasir] Sandbox mode - skip payment verification')
+      if (sumopodStatus !== 'completed') {
+        req.payload.logger.warn(
+          { paymentIntentID, sumopodStatus },
+          '[SumoPod] confirmOrder blocked because payment is not completed',
+        )
+        throw new Error(
+          sumopodStatus
+            ? `Pembayaran belum selesai. Status: ${sumopodStatus}`
+            : 'Pembayaran belum terverifikasi oleh SumoPod.',
+        )
       }
 
       const finalized = await finalizePaidOrder({
@@ -148,7 +155,7 @@ export const pakasirAdapter = (config: PakasirAdapterConfig): PaymentAdapter => 
 
       req.payload.logger.info(
         { orderID: finalized.orderID, transactionID: finalized.transactionID },
-        '[Pakasir] confirmOrder success',
+        '[SumoPod] confirmOrder success',
       )
 
       return {

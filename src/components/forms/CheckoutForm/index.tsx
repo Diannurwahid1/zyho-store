@@ -7,7 +7,7 @@ import { Address } from '@/payload-types'
 import type { AnalyticsItem } from '@/utilities/googleAnalytics'
 import { gaPurchase } from '@/utilities/googleAnalytics'
 import { usePayments } from '@payloadcms/plugin-ecommerce/client/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import QRCode from 'qrcode'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -43,9 +43,10 @@ type Props = {
   buyNowItem?: BuyNowItem | null
   onOrderConfirmed?: (orderID: string) => Promise<void> | void
   onFeeKnown?: (fee: number) => void
+  sumopodPaymentLinkURL?: string
 }
 
-const PakasirCheckoutForm: React.FC<
+const SumoPodCheckoutForm: React.FC<
   Pick<
     Props,
     | 'amount'
@@ -68,6 +69,7 @@ const PakasirCheckoutForm: React.FC<
     | 'selectedVoucherCode'
     | 'setProcessingPayment'
     | 'shippingAddress'
+    | 'sumopodPaymentLinkURL'
   >
 > = ({
   billingAddress,
@@ -90,11 +92,16 @@ const PakasirCheckoutForm: React.FC<
   buyNowItem,
   onOrderConfirmed,
   onFeeKnown,
+  sumopodPaymentLinkURL,
 }) => {
   const [error, setError] = useState<null | string>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [expiredAt, setExpiredAt] = useState<string | null>(null)
+  const [hasDirectQris, setHasDirectQris] = useState(false)
+  const [paymentLinkUrl, setPaymentLinkUrl] = useState<string | null>(
+    sumopodPaymentLinkURL || null,
+  )
   const [totalPayment, setTotalPayment] = useState<number | null>(null)
   const [status, setStatus] = useState<'idle' | 'waiting' | 'completed' | 'failed'>('idle')
   const [isSimulating, setIsSimulating] = useState(false)
@@ -105,6 +112,7 @@ const PakasirCheckoutForm: React.FC<
   }>(null)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
   usePayments()
 
   useEffect(() => {
@@ -116,12 +124,12 @@ const PakasirCheckoutForm: React.FC<
   const startPolling = useCallback(() => {
     if (pollingRef.current) clearInterval(pollingRef.current)
 
-    pollingRef.current = setInterval(async () => {
+    const poll = async () => {
       try {
         const res = await fetch(
           isNowPayments
             ? `/api/nowpayments?paymentId=${encodeURIComponent(String(nowpaymentsPaymentID || ''))}`
-            : `/api/pakasir?order_id=${orderID}&amount=${amount}`,
+            : `/api/sumopod?order_id=${orderID}&amount=${amount}`,
         )
         const data = await readJSONResponse<any>(res)
         const txStatus = isNowPayments
@@ -139,7 +147,10 @@ const PakasirCheckoutForm: React.FC<
 
           try {
             // Use fetch API directly instead of hook
-            const confirmResponse = await fetch('/api/payments/pakasir/confirm-order', {
+            const confirmEndpoint = isNowPayments
+              ? '/api/payments/nowpayments/confirm-order'
+              : '/api/payments/pakasir/confirm-order'
+            const confirmResponse = await fetch(confirmEndpoint, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -219,20 +230,28 @@ const PakasirCheckoutForm: React.FC<
       } catch {
         // ignore transient polling errors
       }
+    }
+
+    void poll()
+    pollingRef.current = setInterval(() => {
+      void poll()
     }, 3000)
   }, [
     amount,
     analyticsItems,
+    billingAddress,
     buyNowItem,
     checkoutSessionId,
     customerEmail,
     isNowPayments,
     nowpaymentsPaymentID,
+    onFeeKnown,
     onOrderConfirmed,
     orderID,
     router,
     selectedVoucherCode,
     setProcessingPayment,
+    shippingAddress,
   ])
 
   const handleCreateQris = useCallback(async () => {
@@ -240,7 +259,7 @@ const PakasirCheckoutForm: React.FC<
     setError(null)
 
     try {
-      const res = await fetch('/api/pakasir', {
+      const res = await fetch('/api/sumopod', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -254,29 +273,63 @@ const PakasirCheckoutForm: React.FC<
 
       const data = await readJSONResponse<any>(res)
 
-      if (!res.ok || !data?.payment?.payment_number) {
+      if (
+        !res.ok ||
+        (!data?.payment?.payment_number &&
+          !data?.payment?.payment_link_url &&
+          !data?.payment?.qris_image_url &&
+          !data?.payment?.qris_payload)
+      ) {
         setError(data?.message || data?.error || 'Gagal membuat transaksi QRIS.')
         setIsLoading(false)
         return
       }
 
-      const { payment_number, expired_at, total_payment } = data.payment
-      const dataUrl = await QRCode.toDataURL(payment_number, { width: 280, margin: 2 })
+      const {
+        expired_at,
+        payment_link_url,
+        payment_number,
+        qris_image_url,
+        qris_payload,
+        total_payment,
+      } = data.payment
+      const paymentTarget = qris_payload || payment_number || payment_link_url
+      const dataUrl =
+        typeof qris_image_url === 'string' && qris_image_url
+          ? qris_image_url
+          : await QRCode.toDataURL(paymentTarget, { width: 280, margin: 2 })
 
       setQrDataUrl(dataUrl)
       setExpiredAt(expired_at)
+      setHasDirectQris(Boolean(qris_payload || qris_image_url || (payment_number && payment_number !== payment_link_url)))
+      setPaymentLinkUrl(payment_link_url || null)
       setStatus('waiting')
-      setTotalPayment(total_payment)
+      setTotalPayment(typeof total_payment === 'number' ? total_payment : amount || null)
       if (onFeeKnown && typeof total_payment === 'number' && typeof amount === 'number') {
         onFeeKnown(total_payment - amount)
+      } else if (onFeeKnown) {
+        onFeeKnown(0)
       }
       startPolling()
+
+      if (payment_link_url && !qris_payload && !qris_image_url) {
+        window.location.assign(String(payment_link_url))
+      }
     } catch {
       setError('Gagal menghubungi server pembayaran.')
     } finally {
       setIsLoading(false)
     }
-  }, [amount, customerName, customerPhone, orderID, startPolling])
+  }, [amount, customerName, customerPhone, onFeeKnown, orderID, startPolling])
+
+  useEffect(() => {
+    const returnedFromSumoPod = Boolean(searchParams.get('sumopod_return'))
+    if (isNowPayments || !returnedFromSumoPod || status !== 'idle' || !orderID || !amount) return
+
+    setStatus('waiting')
+    setTotalPayment(amount)
+    startPolling()
+  }, [amount, isNowPayments, orderID, searchParams, startPolling, status])
 
   useEffect(() => {
     if (!isNowPayments || !nowpaymentsPaymentID || status !== 'idle') return
@@ -293,7 +346,7 @@ const PakasirCheckoutForm: React.FC<
     setError(null)
 
     try {
-      const res = await fetch('/api/pakasir', {
+      const res = await fetch('/api/sumopod', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'simulate', order_id: orderID, amount }),
@@ -331,20 +384,22 @@ const PakasirCheckoutForm: React.FC<
       {status === 'idle' && (
         <div className="flex flex-col gap-4">
           <p className="text-sm text-muted-foreground">
-            Klik tombol di bawah untuk menampilkan kode QRIS pembayaran.
+            Klik tombol di bawah untuk membuka halaman pembayaran aman.
           </p>
           <Button disabled={isLoading} onClick={handleCreateQris} variant="default">
-            {isLoading ? 'Membuat QRIS...' : 'Tampilkan QRIS'}
+            {isLoading ? 'Menyiapkan pembayaran...' : 'Bayar Secure'}
           </Button>
         </div>
       )}
 
-      {status === 'waiting' && qrDataUrl && (
+      {status === 'waiting' && (
         <div className="flex flex-col items-center gap-4">
-          <div className="rounded-xl border bg-white p-4 shadow-sm">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qrDataUrl} alt="QRIS Payment Code" width={280} height={280} />
-          </div>
+          {qrDataUrl ? (
+            <div className="rounded-xl border bg-white p-4 shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrDataUrl} alt="QRIS Payment Code" width={280} height={280} />
+            </div>
+          ) : null}
 
           <div className="space-y-1 text-center">
             {!isNowPayments && typeof totalPayment === 'number' && typeof amount === 'number' ? (
@@ -424,10 +479,18 @@ const PakasirCheckoutForm: React.FC<
             <p className="text-center text-xs text-muted-foreground">
               {isNowPayments
                 ? 'Kirim USDT BEP20 ke alamat di atas. Status akan terdeteksi otomatis setelah transaksi blockchain masuk.'
-                : 'Scan QR di atas dengan aplikasi e-wallet atau mobile banking Anda.'}
+                : 'Selesaikan pembayaran di halaman aman. Status akan terdeteksi otomatis setelah pembayaran berhasil.'}
             </p>
 
-            {!isNowPayments && process.env.NEXT_PUBLIC_PAKASIR_SANDBOX === 'true' && process.env.NODE_ENV !== 'production' && (
+            {!isNowPayments && paymentLinkUrl && !hasDirectQris ? (
+              <Button asChild variant="default" size="sm" className="mt-2 w-full">
+                <a href={paymentLinkUrl} target="_blank" rel="noreferrer">
+                  Bayar Secure
+                </a>
+              </Button>
+            ) : null}
+
+            {!isNowPayments && process.env.NEXT_PUBLIC_SUMOPOD_SANDBOX === 'true' && process.env.NODE_ENV !== 'production' && (
               <Button
                 type="button"
                 variant="outline"
@@ -467,9 +530,10 @@ export const CheckoutForm: React.FC<Props> = ({
   analyticsItems,
   shippingAddress,
   selectedVoucherCode,
+  sumopodPaymentLinkURL,
 }) => {
   return (
-    <PakasirCheckoutForm
+    <SumoPodCheckoutForm
       buyNowItem={buyNowItem}
       billingAddress={billingAddress}
       cartID={cartID}
@@ -490,6 +554,7 @@ export const CheckoutForm: React.FC<Props> = ({
       selectedVoucherCode={selectedVoucherCode}
       setProcessingPayment={setProcessingPayment}
       shippingAddress={shippingAddress}
+      sumopodPaymentLinkURL={sumopodPaymentLinkURL}
     />
   )
 }

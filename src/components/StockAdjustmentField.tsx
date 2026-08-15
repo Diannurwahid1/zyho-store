@@ -7,12 +7,14 @@ import { Textarea } from '@/components/ui/textarea'
 import {
     AlertTriangle,
     Box,
+    FileSpreadsheet,
     FileText,
     KeyRound,
     Package,
     Plus,
     RefreshCw,
     Search,
+    Upload,
 } from 'lucide-react'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -66,6 +68,70 @@ const createEmptyUnit = (): DigitalUnitDraft => ({
   loginUrl: '',
   referenceCode: '',
 })
+
+const normalizeExcelHeader = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .trim()
+
+const normalizeExcelCell = (value: unknown) => {
+  if (value === null || value === undefined) return ''
+  return String(value).trim()
+}
+
+const getExcelValue = (row: Record<string, unknown>, aliases: string[]) => {
+  const normalizedAliases = aliases.map(normalizeExcelHeader)
+
+  for (const [key, value] of Object.entries(row)) {
+    if (normalizedAliases.includes(normalizeExcelHeader(key))) {
+      return normalizeExcelCell(value)
+    }
+  }
+
+  return ''
+}
+
+const mapExcelRowToUnit = (row: Record<string, unknown>): DigitalUnitDraft => ({
+  accountEmail: getExcelValue(row, ['email', 'accountEmail', 'account_email', 'akun_email']),
+  accountPassword: getExcelValue(row, [
+    'password',
+    'pass',
+    'accountPassword',
+    'account_password',
+    'kata_sandi',
+  ]),
+  accountUsername: getExcelValue(row, [
+    'username',
+    'user',
+    'accountUsername',
+    'account_username',
+  ]),
+  content: getExcelValue(row, ['content', 'note', 'notes', 'catatan', 'instruksi']),
+  deliveryType: 'credentials',
+  fileId: '',
+  label: getExcelValue(row, ['label', 'name', 'nama', 'slot']),
+  loginUrl: getExcelValue(row, ['loginUrl', 'login_url', 'url', 'link', 'website']),
+  referenceCode: getExcelValue(row, [
+    'referenceCode',
+    'reference_code',
+    'reference',
+    'ref',
+    'kode',
+    'code',
+  ]),
+})
+
+const hasImportedUnitData = (unit: DigitalUnitDraft) =>
+  [
+    unit.accountEmail,
+    unit.accountPassword,
+    unit.accountUsername,
+    unit.content,
+    unit.label,
+    unit.loginUrl,
+    unit.referenceCode,
+  ].some((value) => value.trim().length > 0)
 
 const isBundleProductRow = (product: Product) =>
   Boolean(product.bundleConfig?.enabled && product.bundleConfig.items?.length)
@@ -125,11 +191,13 @@ const selectStyle: React.CSSProperties = {
 }
 
 export const StockAdjustmentField: React.FC = () => {
+  const importFileRef = useRef<HTMLInputElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [adjusting, setAdjusting] = useState(false)
+  const [isImportingExcel, setIsImportingExcel] = useState(false)
   const [digitalUnits, setDigitalUnits] = useState<DigitalUnitDraft[]>([])
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
 
@@ -283,6 +351,61 @@ export const StockAdjustmentField: React.FC = () => {
     setDigitalUnits((prev) =>
       prev.map((unit, unitIndex) => (unitIndex === index ? { ...unit, [key]: value } : unit)),
     )
+  }
+
+  const handleExcelImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+
+    if (!file) return
+
+    if (!isPerUnitMode) {
+      toast.error('Import Excel hanya untuk produk mode Per-unit digital stock.')
+      return
+    }
+
+    setIsImportingExcel(true)
+
+    try {
+      const XLSX = await import('xlsx')
+      const buffer = await file.arrayBuffer()
+      const workbook = XLSX.read(buffer, { type: 'array' })
+      const firstSheetName = workbook.SheetNames[0]
+
+      if (!firstSheetName) {
+        toast.error('Sheet Excel tidak ditemukan.')
+        return
+      }
+
+      const worksheet = workbook.Sheets[firstSheetName]
+      if (!worksheet) {
+        toast.error('Sheet Excel tidak bisa dibaca.')
+        return
+      }
+
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+        defval: '',
+        raw: false,
+      })
+      const importedUnits = rows.map(mapExcelRowToUnit).filter(hasImportedUnitData)
+
+      if (importedUnits.length === 0) {
+        toast.error('Tidak ada baris credentials yang bisa diimpor.')
+        return
+      }
+
+      setAdjustmentForm((prev) => ({
+        ...prev,
+        quantity: String(importedUnits.length),
+      }))
+      setDigitalUnits(importedUnits)
+      toast.success(`${importedUnits.length} credentials berhasil diimpor dari Excel.`)
+    } catch (err) {
+      console.error('[StockAdjustment] Failed to import Excel', err)
+      toast.error('Gagal membaca Excel. Pastikan format file .xlsx, .xls, atau .csv.')
+    } finally {
+      setIsImportingExcel(false)
+    }
   }
 
   const handleAdjustment = async () => {
@@ -1060,7 +1183,39 @@ export const StockAdjustmentField: React.FC = () => {
                         padding: '1.15rem',
                       }}
                     >
-                      <strong>Isi quantity positif dulu.</strong>
+                      <div
+                        style={{
+                          alignItems: 'center',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '0.75rem',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <strong>Isi quantity positif dulu, atau import dari Excel.</strong>
+                        <div>
+                          <input
+                            ref={importFileRef}
+                            accept=".xlsx,.xls,.csv"
+                            onChange={(event) => void handleExcelImport(event)}
+                            style={{ display: 'none' }}
+                            type="file"
+                          />
+                          <Button
+                            disabled={isImportingExcel || adjusting}
+                            onClick={() => importFileRef.current?.click()}
+                            type="button"
+                            variant="outline"
+                          >
+                            {isImportingExcel ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Upload className="h-4 w-4" />
+                            )}
+                            Import Excel
+                          </Button>
+                        </div>
+                      </div>
                       <p
                         style={{
                           color: 'var(--theme-text-dimmed)',
@@ -1107,27 +1262,91 @@ export const StockAdjustmentField: React.FC = () => {
                           display: 'flex',
                           flexWrap: 'wrap',
                           gap: '0.6rem',
+                          justifyContent: 'space-between',
                           marginBottom: '0.9rem',
                         }}
                       >
-                        <span
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
+                          <span
+                            style={{
+                              ...badgeStyle('success'),
+                              textTransform: 'none',
+                              letterSpacing: 'normal',
+                            }}
+                          >
+                            {digitalUnits.length} slot siap diisi
+                          </span>
+                          <span
+                            style={{
+                              ...badgeStyle('default'),
+                              textTransform: 'none',
+                              letterSpacing: 'normal',
+                            }}
+                          >
+                            1 slot = 1 stok
+                          </span>
+                          <span
+                            style={{
+                              ...badgeStyle('default'),
+                              textTransform: 'none',
+                              letterSpacing: 'normal',
+                            }}
+                          >
+                            Import Excel: credentials
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <input
+                            ref={importFileRef}
+                            accept=".xlsx,.xls,.csv"
+                            onChange={(event) => void handleExcelImport(event)}
+                            style={{ display: 'none' }}
+                            type="file"
+                          />
+                          <Button
+                            disabled={isImportingExcel || adjusting}
+                            onClick={() => importFileRef.current?.click()}
+                            type="button"
+                            variant="outline"
+                          >
+                            {isImportingExcel ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Upload className="h-4 w-4" />
+                            )}
+                            Import Excel
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          alignItems: 'flex-start',
+                          background: 'var(--theme-elevation-100)',
+                          border: '1px solid var(--theme-elevation-150)',
+                          borderRadius: '16px',
+                          display: 'flex',
+                          gap: '0.75rem',
+                          marginBottom: '1rem',
+                          padding: '0.9rem 1rem',
+                        }}
+                      >
+                        <FileSpreadsheet
+                          className="h-5 w-5"
+                          style={{ color: 'var(--theme-success-600)', flex: '0 0 auto' }}
+                        />
+                        <p
                           style={{
-                            ...badgeStyle('success'),
-                            textTransform: 'none',
-                            letterSpacing: 'normal',
+                            color: 'var(--theme-text-dimmed)',
+                            fontSize: '0.84rem',
+                            lineHeight: 1.55,
+                            margin: 0,
                           }}
                         >
-                          {digitalUnits.length} slot siap diisi
-                        </span>
-                        <span
-                          style={{
-                            ...badgeStyle('default'),
-                            textTransform: 'none',
-                            letterSpacing: 'normal',
-                          }}
-                        >
-                          1 slot = 1 stok
-                        </span>
+                          Kolom Excel opsional: label, email, username, password, login_url,
+                          reference_code, content/notes. Baris kosong dilewati. Semua baris impor
+                          otomatis dibuat sebagai tipe credentials.
+                        </p>
                       </div>
 
                       <div

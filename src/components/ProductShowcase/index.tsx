@@ -128,7 +128,11 @@ export const ProductShowcase: React.FC<ProductShowcaseProps> = ({
                 key={product.id}
                 className="group relative h-[254px] w-[164px] shrink-0 overflow-hidden rounded-xl border border-border bg-gradient-to-br from-card to-muted transition-all duration-300 hover:border-foreground/30 md:h-auto md:w-auto"
               >
-                {badgeLabel ? (
+                {(product.inventory ?? 0) <= 0 ? (
+                  <span className="absolute left-2 top-2 z-10 rounded-full bg-red-600 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-white md:left-3 md:top-3 md:text-[10px]">
+                    {isIndonesian ? 'Habis Terjual' : 'Out of Stock'}
+                  </span>
+                ) : badgeLabel ? (
                   <span className="absolute left-2 top-2 z-10 rounded-full bg-foreground px-2 py-1 text-[9px] font-medium uppercase tracking-wide text-background md:left-3 md:top-3 md:text-[10px]">
                     {badgeLabel}
                   </span>

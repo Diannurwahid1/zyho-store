@@ -32,6 +32,7 @@ export default async function ShopPage({ searchParams }: Props) {
       gallery: true,
       categories: true,
       inventory: true,
+      digitalFulfillmentMode: true,
       enableVariants: true,
       variants: true,
       priceInIDR: true,

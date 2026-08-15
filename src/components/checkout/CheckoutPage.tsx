@@ -42,6 +42,7 @@ type PaymentData = {
   nowpaymentsPaymentID?: string
   orderID: string
   paymentMethod: 'nowpayments' | 'pakasir'
+  sumopodPaymentLinkURL?: string
   subtotal: number
   voucherCode?: string | null
 }
@@ -136,6 +137,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
   const [paymentData, setPaymentData] = useState<null | PaymentData>(null)
   const { initiatePayment } = usePayments()
   const [isProcessingPayment, setProcessingPayment] = useState(false)
+  const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false)
   const [reservationId, setReservationId] = useState<string | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [selectedVoucherCode, setSelectedVoucherCode] = useState<string>('')
@@ -586,6 +588,8 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
   const initiatePaymentIntent = useCallback(async () => {
     let claimedSessionID: string | null = null
     let paymentCreated = false
+    setIsRedirectingToPayment(true)
+    setError(null)
     try {
       void persistWhatsAppToProfile()
 
@@ -622,6 +626,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
           setReservationId(existing.reservationId)
           setPaymentData(existing.paymentData)
           setCountdown(Math.max(0, Math.ceil((existing.expiresAt - Date.now()) / 1000)))
+
         }
         throw new Error(sessionError)
       }
@@ -660,6 +665,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
           setError(msg)
           toast.error(msg)
           await releaseReservation(activeSession.sessionId)
+          setIsRedirectingToPayment(false)
           return
         }
 
@@ -725,6 +731,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
           expiresAt: activeSession.expiresAt,
         })
 
+        setIsRedirectingToPayment(false)
         toast.success('Pembayaran siap. Selesaikan sekarang sebelum stok dilepas.')
       }
     } catch (paymentError) {
@@ -738,6 +745,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
 
       setError(errorMessage)
       toast.error(errorMessage)
+      setIsRedirectingToPayment(false)
     }
   }, [
     buyNowItem,
@@ -1091,7 +1099,19 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
           )}
         </div>
 
-        {!paymentData && (
+        {!paymentData && isRedirectingToPayment && (
+          <div className="flex items-center gap-3 rounded-2xl border bg-card p-5">
+            <LoadingSpinner />
+            <div>
+              <p className="font-semibold">Menyiapkan pembayaran...</p>
+              <p className="text-sm text-muted-foreground">
+                Sesi checkout sedang dibuat. Jangan tutup halaman ini.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {!paymentData && !isRedirectingToPayment && (
           <div className="space-y-4">
             <label className="flex items-start gap-3 cursor-pointer">
               <input
@@ -1111,13 +1131,18 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
             </label>
             <Button
               className="self-start"
-              disabled={!canGoToPayment || checkoutSession.isLocked || !termsAccepted}
+              disabled={
+                !canGoToPayment ||
+                checkoutSession.isLocked ||
+                !termsAccepted ||
+                isRedirectingToPayment
+              }
               onClick={(e) => {
                 e.preventDefault()
                 void initiatePaymentIntent()
               }}
             >
-              Lanjut ke pembayaran
+              {isRedirectingToPayment ? 'Menyiapkan...' : 'Lanjut ke pembayaran'}
             </Button>
           </div>
         )}
@@ -1210,6 +1235,7 @@ export const CheckoutPage: React.FC<Props> = ({ initialEligibleVouchers }) => {
                 selectedVoucherCode={paymentData.voucherCode || selectedVoucherCode}
                 setProcessingPayment={setProcessingPayment}
                 shippingAddress={checkoutContactAddress}
+                sumopodPaymentLinkURL={paymentData.sumopodPaymentLinkURL}
               />
 
               <Button
