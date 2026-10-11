@@ -74,7 +74,9 @@ export default function NewSupportTicketPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-semibold">New Support Ticket</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Describe your issue and we'll get back to you soon</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Describe your issue and we&apos;ll get back to you soon
+          </p>
         </div>
       </div>
 

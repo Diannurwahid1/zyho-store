@@ -1,7 +1,9 @@
 import { releaseReservation } from '@/lib/stock'
+import { getAttemptPublicPaymentData, relationID as paymentRelationID } from '@/payments/paymentAttempts'
 import type { BasePayload, PayloadRequest } from 'payload'
 
-export const CHECKOUT_SESSION_TTL_MS = 10 * 60 * 1000
+export const CHECKOUT_SESSION_TTL_MS = 60 * 60 * 1000
+export const PAYMENT_FINALIZATION_GRACE_MS = 30 * 60 * 1000
 
 const relationID = (value: unknown): string | number | null => {
   if (typeof value === 'string' || typeof value === 'number') return value
@@ -28,6 +30,46 @@ export const expireCheckoutSessions = async (payload: BasePayload, customerID: s
   })
 
   for (const session of expired.docs as any[]) {
+    const linkedAttemptID = paymentRelationID(session.paymentAttempt)
+    let attempt: Record<string, any> | null = null
+
+    if (linkedAttemptID) {
+      attempt = (await payload.findByID({
+        collection: 'payment-attempts' as any,
+        depth: 0,
+        id: linkedAttemptID,
+        overrideAccess: true,
+      })) as Record<string, any>
+    } else {
+      const attempts = await payload.find({
+        collection: 'payment-attempts' as any,
+        depth: 0,
+        limit: 1,
+        overrideAccess: true,
+        pagination: false,
+        where: { checkoutSession: { equals: session.id } } as any,
+      })
+      attempt = (attempts.docs[0] as Record<string, any> | undefined) || null
+    }
+
+    if (attempt && ['completed', 'finalizing', 'consumed'].includes(String(attempt.status))) {
+      await payload.update({
+        collection: 'checkout-sessions' as any,
+        id: session.id,
+        data: {
+          ...(attempt.status === 'consumed'
+            ? { activeKey: null, status: 'completed' }
+            : {
+                expiresAt: new Date(Date.now() + PAYMENT_FINALIZATION_GRACE_MS).toISOString(),
+                status: 'pending',
+              }),
+          paymentData: getAttemptPublicPaymentData(attempt),
+        } as any,
+        overrideAccess: true,
+      })
+      continue
+    }
+
     await releaseOwnedCheckoutReservations(
       payload,
       customerID,

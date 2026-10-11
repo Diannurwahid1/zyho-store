@@ -61,11 +61,13 @@ export const createDigitalStockUnits = async ({
   entries,
   payload,
   productId,
+  req,
   variantId,
 }: {
   entries: DigitalStockInput[]
   payload: BasePayload
   productId: number | string
+  req?: PayloadRequest
   variantId?: string | null
 }) => {
   const created = []
@@ -91,6 +93,7 @@ export const createDigitalStockUnits = async ({
         variant: variantId || undefined,
       } as any,
       overrideAccess: true,
+      req,
     })
 
     created.push(createdUnit)
@@ -172,9 +175,8 @@ export const assignDigitalStockToOrder = async ({
       const assignedUnits = []
 
       for (const unit of availableUnits.docs as Record<string, any>[]) {
-        const updatedUnit = await req.payload.update({
-          collection: 'digital-stock-units',
-          id: unit.id,
+        const updatedUnit = await req.payload.db.updateOne({
+          collection: 'digital-stock-units' as any,
           data: {
             assignedAt: new Date().toISOString(),
             customer: customerID || undefined,
@@ -182,11 +184,26 @@ export const assignDigitalStockToOrder = async ({
             reservationId: `order:${orderID}`,
             status: 'assigned',
           } as any,
-          overrideAccess: true,
           req,
+          where: {
+            and: [
+              { id: { equals: unit.id } },
+              { status: { equals: 'available' } },
+              {
+                or: [
+                  { redeemEnabled: { exists: false } },
+                  { redeemEnabled: { equals: false } },
+                ],
+              },
+            ],
+          } as any,
         })
 
-        assignedUnits.push(buildDigitalUnitSnapshot(updatedUnit as Record<string, any>))
+        if (!updatedUnit) {
+          throw new Error('Stok unit digital baru saja digunakan oleh pesanan lain.')
+        }
+
+        assignedUnits.push(buildDigitalUnitSnapshot(unit))
       }
 
       deliveries.push({
@@ -228,27 +245,20 @@ export const assignDigitalStockToOrder = async ({
       for (const asset of digitalAssets.docs as Record<string, any>[]) {
         // Buat download-access record untuk customer
         if (customerID) {
-          try {
-            await req.payload.create({
-              collection: 'download-access',
-              data: {
-                customer: customerID,
-                product: productID,
-                order: orderID,
-                asset: asset.id,
-                status: 'active',
-                maxDownloads: 10,
-                downloadCount: 0,
-              } as any,
-              overrideAccess: true,
-              req,
-            })
-          } catch (err) {
-            req.payload.logger.warn(
-              { err, assetId: asset.id },
-              '[DigitalStock] Gagal buat download-access',
-            )
-          }
+          await req.payload.create({
+            collection: 'download-access',
+            data: {
+              customer: customerID,
+              product: productID,
+              order: orderID,
+              asset: asset.id,
+              status: 'active',
+              maxDownloads: 10,
+              downloadCount: 0,
+            } as any,
+            overrideAccess: true,
+            req,
+          })
         }
 
         // Tambahkan ke units snapshot untuk ditampilkan di order page

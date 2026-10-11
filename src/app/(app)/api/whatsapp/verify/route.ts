@@ -8,6 +8,7 @@ import configPromise from '@payload-config'
 import { headers as getHeaders } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
+import { enforceRateLimit, getClientIP, readJSONBodyLimited } from '@/utilities/security'
 
 export async function POST(req: NextRequest) {
   const headers = await getHeaders()
@@ -18,8 +19,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await req.json().catch(() => ({}))
-  const { phone } = body as { phone?: string }
+  const rateLimited = enforceRateLimit({
+    key: `whatsapp-verify:${user.id}:${getClientIP(req)}`,
+    limit: 3,
+    request: req,
+    responseMessage: 'Batas verifikasi WhatsApp tercapai. Coba lagi nanti.',
+    windowMs: 60 * 60_000,
+  })
+  if (rateLimited) return rateLimited
+  const parsed = await readJSONBodyLimited<{ phone?: unknown }>(req, 4 * 1024)
+  if (parsed.response) return parsed.response
+  const { phone } = parsed.data
 
   if (!phone || typeof phone !== 'string') {
     return NextResponse.json({ error: 'Nomor WhatsApp wajib diisi.' }, { status: 400 })

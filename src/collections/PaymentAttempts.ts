@@ -1,0 +1,80 @@
+import { adminOnly } from '@/access/adminOnly'
+import { checkRole } from '@/access/utilities'
+import type { CollectionConfig } from 'payload'
+
+export const PaymentAttempts: CollectionConfig = {
+  slug: 'payment-attempts',
+  access: {
+    create: adminOnly,
+    delete: adminOnly,
+    read: ({ req: { user } }) => checkRole(['admin', 'manager', 'finance'], user),
+    update: adminOnly,
+  },
+  admin: {
+    defaultColumns: [
+      'attemptId',
+      'provider',
+      'providerOrderId',
+      'expectedAmount',
+      'currency',
+      'status',
+      'updatedAt',
+    ],
+    group: 'Commerce',
+    useAsTitle: 'attemptId',
+  },
+  fields: [
+    { name: 'attemptId', type: 'text', required: true, unique: true, index: true },
+    {
+      name: 'checkoutSession',
+      type: 'relationship',
+      relationTo: 'checkout-sessions',
+      required: true,
+      unique: true,
+      index: true,
+    },
+    { name: 'customer', type: 'relationship', relationTo: 'users', required: true, index: true },
+    { name: 'cartId', type: 'text', required: true, index: true },
+    {
+      name: 'provider',
+      type: 'select',
+      required: true,
+      index: true,
+      options: ['sumopod', 'nowpayments'],
+    },
+    { name: 'providerOrderId', type: 'text', required: true, unique: true, index: true },
+    { name: 'providerPaymentId', type: 'text', unique: true, index: true },
+    { name: 'expectedAmount', type: 'number', required: true, min: 1 },
+    { name: 'paidAmount', type: 'number', min: 0 },
+    {
+      name: 'currency',
+      type: 'select',
+      required: true,
+      options: ['IDR', 'USD'],
+    },
+    {
+      name: 'status',
+      type: 'select',
+      required: true,
+      defaultValue: 'initiated',
+      index: true,
+      options: [
+        'initiated',
+        'creating',
+        'pending',
+        'completed',
+        'finalizing',
+        'failed',
+        'expired',
+        'cancelled',
+        'consumed',
+      ],
+    },
+    { name: 'snapshot', type: 'json', required: true },
+    { name: 'providerData', type: 'json' },
+    { name: 'verifiedAt', type: 'date' },
+    { name: 'consumedAt', type: 'date' },
+    { name: 'order', type: 'relationship', relationTo: 'orders', index: true },
+  ],
+  timestamps: true,
+}

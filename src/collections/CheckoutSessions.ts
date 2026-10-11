@@ -42,6 +42,12 @@ export const CheckoutSessions: CollectionConfig = {
       required: true,
       options: ['pakasir', 'nowpayments'],
     },
+    {
+      name: 'paymentAttempt',
+      type: 'relationship',
+      relationTo: 'payment-attempts',
+      index: true,
+    },
     { name: 'paymentData', type: 'json' },
     { name: 'order', type: 'relationship', relationTo: 'orders' },
   ],

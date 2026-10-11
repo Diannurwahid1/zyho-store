@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url'
 
 import { adminOnly } from '@/access/adminOnly'
 import { checkRole } from '@/access/utilities'
+import { moveMediaFilesToPrivateStorage } from '@/utilities/privateMedia'
 
 const canReadSupportAttachments = (user: any) =>
   checkRole(['admin', 'manager', 'support'], user)
@@ -32,9 +33,10 @@ export const Media: CollectionConfig = {
         return {
           or: [
             {
-              isSupportAttachment: {
-                not_equals: true,
-              },
+              and: [
+                { isSupportAttachment: { not_equals: true } },
+                { isProtectedDigitalAsset: { not_equals: true } },
+              ],
             },
             {
               uploadedBy: {
@@ -46,12 +48,22 @@ export const Media: CollectionConfig = {
       }
 
       return {
-        isSupportAttachment: {
-          not_equals: true,
-        },
+        and: [
+          { isSupportAttachment: { not_equals: true } },
+          { isProtectedDigitalAsset: { not_equals: true } },
+        ],
       } as Where
     },
     update: adminOnly,
+  },
+  hooks: {
+    afterChange: [
+      async ({ doc }) => {
+        if (doc.isSupportAttachment || doc.isProtectedDigitalAsset) {
+          await moveMediaFilesToPrivateStorage(doc as Record<string, any>)
+        }
+      },
+    ],
   },
   fields: [
     {
@@ -70,6 +82,15 @@ export const Media: CollectionConfig = {
     },
     {
       name: 'isSupportAttachment',
+      type: 'checkbox',
+      defaultValue: false,
+      admin: {
+        position: 'sidebar',
+        readOnly: true,
+      },
+    },
+    {
+      name: 'isProtectedDigitalAsset',
       type: 'checkbox',
       defaultValue: false,
       admin: {

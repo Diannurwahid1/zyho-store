@@ -27,6 +27,8 @@ import { Licenses } from '@/collections/Licenses'
 import { Media } from '@/collections/Media'
 import { Pages } from '@/collections/Pages'
 import { PaymentTransactions } from '@/collections/PaymentTransactions'
+import { PaymentAttempts } from '@/collections/PaymentAttempts'
+import { PaymentWebhookEvents } from '@/collections/PaymentWebhookEvents'
 import { PromoBanners } from '@/collections/PromoBanners'
 import { SignupCampaignRewards } from '@/collections/SignupCampaignRewards'
 import { SignupVoucherCampaigns } from '@/collections/SignupVoucherCampaigns'
@@ -91,6 +93,8 @@ export default buildConfig({
     DownloadAccess,
     DownloadLogs,
     Licenses,
+    PaymentAttempts,
+    PaymentWebhookEvents,
     PaymentTransactions,
     Coupons,
     SignupVoucherCampaigns,

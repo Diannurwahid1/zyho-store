@@ -60,9 +60,19 @@ const InfoRow = ({ label, value, isLink = false }: { label: string; value: strin
   )
 }
 
-export function DeliveryUnitCard({ unit }: { unit: DeliveryUnit }) {
+export function DeliveryUnitCard({
+  accessToken,
+  unit,
+}: {
+  accessToken?: string
+  unit: DeliveryUnit
+}) {
   const [copied, setCopied] = useState(false)
   const file = unit.file && typeof unit.file === 'object' ? (unit.file as Media) : null
+  const fileURL =
+    file?.url && accessToken
+      ? `${file.url}${file.url.includes('?') ? '&' : '?'}accessToken=${encodeURIComponent(accessToken)}`
+      : file?.url
   const copyPayload = useMemo(() => buildCopyPayload({ ...unit, file }), [file, unit])
 
   const handleCopy = async () => {
@@ -114,13 +124,13 @@ export function DeliveryUnitCard({ unit }: { unit: DeliveryUnit }) {
         {unit.loginUrl ? <InfoRow label="Login URL" value={unit.loginUrl} isLink /> : null}
         {unit.referenceCode ? <InfoRow label="Reference" value={unit.referenceCode} /> : null}
         {unit.content ? <InfoRow label="Content" value={unit.content} /> : null}
-        {file?.url ? <InfoRow label="File URL" value={file.url} isLink /> : null}
+        {fileURL ? <InfoRow label="File URL" value={fileURL} isLink /> : null}
         {file?.filename ? <InfoRow label="File Name" value={file.filename} /> : null}
 
-        {file?.url ? (
+        {fileURL ? (
           <div className="pt-1">
             <Button asChild variant="secondary" size="sm" className="w-full sm:w-auto">
-              <Link href={file.url} target="_blank" rel="noreferrer">
+              <Link href={fileURL} target="_blank" rel="noreferrer">
                 Download File
               </Link>
             </Button>

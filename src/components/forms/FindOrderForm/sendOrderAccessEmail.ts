@@ -3,6 +3,9 @@
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 import { getServerSideURL } from '@/utilities/getURL'
+import { createOrderAccessToken } from '@/utilities/orderAccessToken'
+import { enforceRateLimit, getClientIP } from '@/utilities/security'
+import { headers as getHeaders } from 'next/headers'
 
 type SendOrderAccessEmailArgs = {
   email: string
@@ -18,13 +21,39 @@ export async function sendOrderAccessEmail({
   email,
   orderID,
 }: SendOrderAccessEmailArgs): Promise<SendOrderAccessEmailResult> {
+  const normalizedEmail = email.trim().toLowerCase()
+  const normalizedOrderID = orderID.trim()
+  if (
+    normalizedEmail.length > 254 ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) ||
+    !/^\d{1,20}$/.test(normalizedOrderID)
+  ) {
+    return { success: true }
+  }
+
+  const requestHeaders = await getHeaders()
+  const rateLimitRequest = new Request(`${getServerSideURL()}/find-order`, {
+    headers: requestHeaders,
+    method: 'POST',
+  })
+  const rateLimited = enforceRateLimit({
+    key: `find-order:${getClientIP(rateLimitRequest)}`,
+    limit: 5,
+    request: rateLimitRequest,
+    windowMs: 60 * 60_000,
+  })
+  if (rateLimited) return { success: true }
+
   const payload = await getPayload({ config: configPromise })
 
   try {
     const { docs: orders } = await payload.find({
       collection: 'orders',
       where: {
-        and: [{ id: { equals: orderID } }, { customerEmail: { equals: email } }],
+        and: [
+          { id: { equals: normalizedOrderID } },
+          { customerEmail: { equals: normalizedEmail } },
+        ],
       },
       limit: 1,
       depth: 0,
@@ -32,12 +61,13 @@ export async function sendOrderAccessEmail({
 
     const order = orders[0]
 
-    if (!order || !order.accessToken) {
+    if (!order) {
       return { success: true }
     }
 
     const serverURL = getServerSideURL()
-    const orderURL = `${serverURL}/orders/${order.id}?email=${encodeURIComponent(email)}&accessToken=${order.accessToken}`
+    const accessToken = createOrderAccessToken({ email: normalizedEmail, orderID: order.id })
+    const orderURL = `${serverURL}/orders/${order.id}?accessToken=${encodeURIComponent(accessToken)}`
 
     const emailBody = `
         <h1>View Your Order</h1>
@@ -48,10 +78,8 @@ export async function sendOrderAccessEmail({
         <p>This link will give you access to view your order details.</p>
       `
 
-    console.log('[sendOrderAccessEmail] Email body:', emailBody)
-
     await payload.sendEmail({
-      to: email,
+      to: normalizedEmail,
       subject: `Access your order #${order.id}`,
       html: emailBody,
     })

@@ -4,7 +4,7 @@ import type { CollectionConfig } from 'payload'
 export const Waitlists: CollectionConfig = {
   slug: 'waitlists',
   access: {
-    create: () => true, // Public — anyone can join waitlist
+    create: staffOnly,
     delete: adminOrManager,
     read: staffOnly,
     update: adminOrManager,

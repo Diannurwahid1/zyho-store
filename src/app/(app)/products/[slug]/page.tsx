@@ -10,6 +10,7 @@ import { getNormalizedBundleItems } from '@/lib/bundles'
 import { getProductArtworkImages } from '@/lib/productArtwork'
 import { Button } from '@/components/ui/button'
 import { getCachedCurrencySettings } from '@/utilities/currencySettings'
+import { hydrateProductAvailableInventory } from '@/lib/stock'
 import { getClientLanguage } from '@/utilities/getClientLanguage'
 import {
     CURRENCY_PREFERENCE_COOKIE,
@@ -209,7 +210,7 @@ export default async function ProductPage({ params }: Args) {
                     })}
                   </div>
                 </div>
-              ) : Boolean(gallery?.length) ? (
+              ) : gallery?.length ? (
                 <Gallery gallery={gallery} />
               ) : (
                 <div className="relative aspect-square w-full overflow-hidden rounded-[1.75rem] border bg-card shadow-sm">
@@ -324,5 +325,6 @@ const queryProductBySlug = async ({ slug }: { slug: string }) => {
     },
   })
 
-  return result.docs?.[0] || null
+  const product = result.docs?.[0]
+  return product ? hydrateProductAvailableInventory(payload, product) : null
 }

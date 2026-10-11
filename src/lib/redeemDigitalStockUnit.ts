@@ -1,4 +1,6 @@
-import { addStock } from '@/lib/stock'
+import { withPayloadTransaction } from '@/utilities/payloadTransaction'
+import { keyedLookup } from '@/utilities/sensitiveData'
+import { createHash } from 'crypto'
 import type { PayloadRequest } from 'payload'
 
 type RedeemInput = {
@@ -27,10 +29,10 @@ const normalizeRelationID = (value: unknown) => {
   return null
 }
 
-const hashRedeemCode = async (value: string) => {
-  const { createHash } = await import('crypto')
-  return createHash('sha256').update(value).digest('hex')
-}
+const getRedeemCodeLookups = (value: string) => [
+  keyedLookup('redeem-code', value),
+  createHash('sha256').update(value).digest('hex'),
+]
 
 const buildSnapshotUnit = (unit: Record<string, any>) => ({
   accountEmail: unit.accountEmail || undefined,
@@ -67,13 +69,14 @@ export const redeemDigitalStockUnit = async ({ code, req, user }: RedeemInput) =
   if (!normalizedCode) {
     throw new Error('Kode redeem wajib diisi.')
   }
+  if (normalizedCode.length > 128) throw new Error('Kode redeem tidak valid.')
 
   const userID = normalizeRelationID(user)
   if (!userID) {
     throw new Error('User redeem tidak valid.')
   }
 
-  const lookup = await hashRedeemCode(normalizedCode)
+  const lookups = getRedeemCodeLookups(normalizedCode)
 
   const matchedUnits = await req.payload.find({
     collection: 'digital-stock-units',
@@ -83,9 +86,7 @@ export const redeemDigitalStockUnit = async ({ code, req, user }: RedeemInput) =
     pagination: false,
     req,
     where: {
-      redeemCodeLookup: {
-        equals: lookup,
-      },
+      redeemCodeLookup: { in: lookups },
     } as any,
   })
 
@@ -130,15 +131,27 @@ export const redeemDigitalStockUnit = async ({ code, req, user }: RedeemInput) =
   const phone =
     typeof user.phone === 'string' && user.phone.trim().length > 0 ? user.phone.trim() : undefined
 
-  let createdOrder: Record<string, any> | null = null
-  let inventoryReduced = false
-  let unitAssigned = false
+  return withPayloadTransaction(req, async () => {
+    const claimID = `gift-redeem:${crypto.randomUUID()}`
+    const claimedUnit = await req.payload.db.updateOne({
+      collection: 'digital-stock-units',
+      data: { reservationId: claimID, status: 'reserved' },
+      req,
+      where: {
+        and: [
+          { id: { equals: unit.id } },
+          { redeemCodeLookup: { in: lookups } },
+          { redeemEnabled: { equals: true } },
+          { status: { equals: 'available' } },
+          { redeemedAt: { exists: false } },
+        ],
+      } as any,
+    })
+    if (!claimedUnit) throw new Error('Kode redeem sudah digunakan atau sedang diproses.')
 
-  try {
-    createdOrder = (await req.payload.create({
+    const createdOrder = (await req.payload.create({
       collection: 'orders',
       data: {
-        accessToken: crypto.randomUUID(),
         amount: 0,
         currency: 'IDR',
         customer: userID,
@@ -175,13 +188,12 @@ export const redeemDigitalStockUnit = async ({ code, req, user }: RedeemInput) =
         redeemOrder: createdOrder.id,
         redeemedAt: new Date().toISOString(),
         redeemedBy: userID,
-        reservationId: `gift-redeem:${createdOrder.id}`,
+        reservationId: claimID,
         status: 'assigned',
       } as any,
       overrideAccess: true,
       req,
     })) as Record<string, any>
-    unitAssigned = true
 
     await req.payload.update({
       collection: 'orders',
@@ -192,7 +204,7 @@ export const redeemDigitalStockUnit = async ({ code, req, user }: RedeemInput) =
             product: product.id,
             productTitle: product.title,
             quantity: 1,
-            units: [buildSnapshotUnit(updatedUnit)],
+            units: [buildSnapshotUnit({ ...unit, ...updatedUnit })],
             variant: variantDoc ? String(variantDoc.id) : undefined,
             variantTitle: variantDoc?.title || undefined,
           },
@@ -202,70 +214,10 @@ export const redeemDigitalStockUnit = async ({ code, req, user }: RedeemInput) =
       req,
     })
 
-    const stockResult = await addStock(req.payload, {
-      notes: `Gift redeem dari kode ${normalizedCode}`,
-      performedById: userID,
-      productId: product.id,
-      quantity: -1,
-      referenceId: paymentReference,
-      type: 'out',
-      variantId: variantDoc ? String(variantDoc.id) : null,
-    })
-
-    if (!stockResult.success) {
-      throw new Error(stockResult.error || 'Gagal mengurangi stok produk redeem.')
-    }
-    inventoryReduced = true
-
     return {
       orderId: createdOrder.id,
       productTitle: product.title || 'Produk redeem',
       unitCode: updatedUnit.unitCode || String(updatedUnit.id),
     }
-  } catch (error) {
-    if (inventoryReduced) {
-      await addStock(req.payload, {
-        notes: `Rollback gift redeem ${paymentReference}`,
-        performedById: userID,
-        productId: product.id,
-        quantity: 1,
-        referenceId: `rollback:${paymentReference}`,
-        type: 'adjust',
-        variantId: variantDoc ? String(variantDoc.id) : null,
-      }).catch(() => null)
-    }
-
-    if (unitAssigned) {
-      await req.payload.update({
-        collection: 'digital-stock-units',
-        id: unit.id,
-        data: {
-          assignedAt: null,
-          customer: null,
-          order: null,
-          redeemCode: unit.redeemCode || null,
-          redeemCodeLookup: unit.redeemCodeLookup || null,
-          redeemEnabled: true,
-          redeemOrder: null,
-          redeemedAt: null,
-          redeemedBy: null,
-          reservationId: null,
-          status: 'available',
-        } as any,
-        overrideAccess: true,
-        req,
-      }).catch(() => null)
-    }
-
-    if (createdOrder?.id) {
-      await req.payload.delete({
-        collection: 'orders',
-        id: createdOrder.id,
-        overrideAccess: true,
-        req,
-      }).catch(() => null)
-    }
-
-    throw error
-  }
+  })
 }

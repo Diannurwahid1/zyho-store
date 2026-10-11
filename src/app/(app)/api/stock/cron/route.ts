@@ -8,7 +8,7 @@ const CRON_SECRET = process.env.CRON_SECRET
 
 /**
  * GET /api/stock/cron
- * Endpoint cron untuk release reservasi yang expired (> 10 menit).
+ * Endpoint cron untuk release reservasi yang expired (> 60 menit).
  * Dipanggil oleh Vercel Cron / external scheduler setiap 1 menit.
  *
  * Header: Authorization: Bearer <CRON_SECRET>

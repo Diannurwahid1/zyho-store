@@ -82,6 +82,8 @@ export interface Config {
     'download-access': DownloadAccess;
     'download-logs': DownloadLog;
     licenses: License;
+    'payment-attempts': PaymentAttempt;
+    'payment-webhook-events': PaymentWebhookEvent;
     'payment-transactions': PaymentTransaction;
     coupons: Coupon;
     'signup-voucher-campaigns': SignupVoucherCampaign;
@@ -142,6 +144,8 @@ export interface Config {
     'download-access': DownloadAccessSelect<false> | DownloadAccessSelect<true>;
     'download-logs': DownloadLogsSelect<false> | DownloadLogsSelect<true>;
     licenses: LicensesSelect<false> | LicensesSelect<true>;
+    'payment-attempts': PaymentAttemptsSelect<false> | PaymentAttemptsSelect<true>;
+    'payment-webhook-events': PaymentWebhookEventsSelect<false> | PaymentWebhookEventsSelect<true>;
     'payment-transactions': PaymentTransactionsSelect<false> | PaymentTransactionsSelect<true>;
     coupons: CouponsSelect<false> | CouponsSelect<true>;
     'signup-voucher-campaigns': SignupVoucherCampaignsSelect<false> | SignupVoucherCampaignsSelect<true>;
@@ -295,6 +299,7 @@ export interface Media {
   alt: string;
   uploadedBy?: (number | null) | User;
   isSupportAttachment?: boolean | null;
+  isProtectedDigitalAsset?: boolean | null;
   caption?: {
     root: {
       type: string;
@@ -1079,9 +1084,6 @@ export interface Form {
       )[]
     | null;
   submitButtonLabel?: string | null;
-  /**
-   * Choose whether to display an on-page message or redirect to a different page after they submit the form.
-   */
   confirmationType?: ('message' | 'redirect') | null;
   confirmationMessage?: {
     root: {
@@ -1101,9 +1103,6 @@ export interface Form {
   redirect?: {
     url: string;
   };
-  /**
-   * Send custom emails when the form submits. Use comma separated lists to send the same email to multiple recipients. To reference a value from this form, wrap that field's name with double curly brackets, i.e. {{firstName}}. You can use a wildcard {{*}} to output all data and {{*:table}} to format it as an HTML table in the email.
-   */
   emails?:
     | {
         emailTo?: string | null;
@@ -1112,9 +1111,6 @@ export interface Form {
         replyTo?: string | null;
         emailFrom?: string | null;
         subject: string;
-        /**
-         * Enter the message that should be sent in this email.
-         */
         message?: {
           root: {
             type: string;
@@ -1248,7 +1244,7 @@ export interface StockReservation {
   quantity: number;
   status: 'pending' | 'confirmed' | 'released';
   /**
-   * Waktu reservasi expired. Default: 10 menit dari waktu dibuat.
+   * Waktu reservasi expired. Default: 60 menit dari waktu dibuat.
    */
   expiresAt: string;
   /**
@@ -1580,6 +1576,7 @@ export interface CheckoutSession {
   cartId?: string | null;
   currency: 'IDR' | 'USD';
   paymentMethod: 'pakasir' | 'nowpayments';
+  paymentAttempt?: (number | null) | PaymentAttempt;
   paymentData?:
     | {
         [k: string]: unknown;
@@ -1589,6 +1586,48 @@ export interface CheckoutSession {
     | number
     | boolean
     | null;
+  order?: (number | null) | Order;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payment-attempts".
+ */
+export interface PaymentAttempt {
+  id: number;
+  attemptId: string;
+  checkoutSession: number | CheckoutSession;
+  customer: number | User;
+  cartId: string;
+  provider: 'sumopod' | 'nowpayments';
+  providerOrderId: string;
+  providerPaymentId?: string | null;
+  expectedAmount: number;
+  paidAmount?: number | null;
+  currency: 'IDR' | 'USD';
+  status:
+    'initiated' | 'creating' | 'pending' | 'completed' | 'finalizing' | 'failed' | 'expired' | 'cancelled' | 'consumed';
+  snapshot:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  providerData?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  verifiedAt?: string | null;
+  consumedAt?: string | null;
   order?: (number | null) | Order;
   updatedAt: string;
   createdAt: string;
@@ -1640,6 +1679,23 @@ export interface License {
   maxActivations?: number | null;
   activationCount?: number | null;
   expiresAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payment-webhook-events".
+ */
+export interface PaymentWebhookEvent {
+  id: number;
+  externalId: string;
+  provider: 'sumopod' | 'nowpayments';
+  eventType: string;
+  payloadHash: string;
+  status: 'processing' | 'processed' | 'failed';
+  paymentAttempt?: (number | null) | PaymentAttempt;
+  processedAt?: string | null;
+  error?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -1979,6 +2035,14 @@ export interface PayloadLockedDocument {
         value: number | License;
       } | null)
     | ({
+        relationTo: 'payment-attempts';
+        value: number | PaymentAttempt;
+      } | null)
+    | ({
+        relationTo: 'payment-webhook-events';
+        value: number | PaymentWebhookEvent;
+      } | null)
+    | ({
         relationTo: 'payment-transactions';
         value: number | PaymentTransaction;
       } | null)
@@ -2168,6 +2232,7 @@ export interface CheckoutSessionsSelect<T extends boolean = true> {
   cartId?: T;
   currency?: T;
   paymentMethod?: T;
+  paymentAttempt?: T;
   paymentData?: T;
   order?: T;
   updatedAt?: T;
@@ -2364,6 +2429,7 @@ export interface MediaSelect<T extends boolean = true> {
   alt?: T;
   uploadedBy?: T;
   isSupportAttachment?: T;
+  isProtectedDigitalAsset?: T;
   caption?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -2469,6 +2535,46 @@ export interface LicensesSelect<T extends boolean = true> {
   maxActivations?: T;
   activationCount?: T;
   expiresAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payment-attempts_select".
+ */
+export interface PaymentAttemptsSelect<T extends boolean = true> {
+  attemptId?: T;
+  checkoutSession?: T;
+  customer?: T;
+  cartId?: T;
+  provider?: T;
+  providerOrderId?: T;
+  providerPaymentId?: T;
+  expectedAmount?: T;
+  paidAmount?: T;
+  currency?: T;
+  status?: T;
+  snapshot?: T;
+  providerData?: T;
+  verifiedAt?: T;
+  consumedAt?: T;
+  order?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payment-webhook-events_select".
+ */
+export interface PaymentWebhookEventsSelect<T extends boolean = true> {
+  externalId?: T;
+  provider?: T;
+  eventType?: T;
+  payloadHash?: T;
+  status?: T;
+  paymentAttempt?: T;
+  processedAt?: T;
+  error?: T;
   updatedAt?: T;
   createdAt?: T;
 }

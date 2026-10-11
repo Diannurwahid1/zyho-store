@@ -193,12 +193,6 @@ const SumoPodCheckoutForm: React.FC<
               }
 
               const nextURL = new URL(`/orders/${result.orderID}`, window.location.origin)
-              if ('accessToken' in result && result.accessToken) {
-                nextURL.searchParams.set('accessToken', String(result.accessToken))
-              }
-              if (customerEmail) {
-                nextURL.searchParams.set('email', customerEmail)
-              }
 
               console.log('[CheckoutForm] Payment confirmed, redirecting to order page...')
 
@@ -323,8 +317,8 @@ const SumoPodCheckoutForm: React.FC<
   }, [amount, customerName, customerPhone, onFeeKnown, orderID, startPolling])
 
   useEffect(() => {
-    const returnedFromSumoPod = Boolean(searchParams.get('sumopod_return'))
-    if (isNowPayments || !returnedFromSumoPod || status !== 'idle' || !orderID || !amount) return
+    const sumoPodReturn = searchParams.get('sumopod_return')
+    if (isNowPayments || sumoPodReturn !== 'success' || status !== 'idle' || !orderID || !amount) return
 
     setStatus('waiting')
     setTotalPayment(amount)
@@ -396,7 +390,6 @@ const SumoPodCheckoutForm: React.FC<
         <div className="flex flex-col items-center gap-4">
           {qrDataUrl ? (
             <div className="rounded-xl border bg-white p-4 shadow-sm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={qrDataUrl} alt="QRIS Payment Code" width={280} height={280} />
             </div>
           ) : null}

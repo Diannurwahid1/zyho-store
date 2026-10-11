@@ -1,4 +1,5 @@
 import configPromise from '@payload-config'
+import { hashGoogleID } from '@/utilities/sensitiveData'
 import { User } from '@/payload-types'
 import { getServerSideURL } from '@/utilities/getURL'
 import { generatePayloadCookie, getFieldsToSign, getPayload, jwtSign } from 'payload'
@@ -257,7 +258,7 @@ export const loginOrCreateGoogleCustomer = async (code: string) => {
       or: [
         {
           googleId: {
-            equals: profile.sub,
+            equals: hashGoogleID(profile.sub),
           },
         },
         {

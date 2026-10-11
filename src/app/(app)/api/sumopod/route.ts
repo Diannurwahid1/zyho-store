@@ -1,7 +1,20 @@
 import { notifyPendingPayment } from '@/lib/commerceWhatsApp'
-import { findActiveCheckoutSession } from '@/lib/checkoutSessionServer'
+import {
+  findActiveCheckoutSession,
+  releaseOwnedCheckoutReservations,
+} from '@/lib/checkoutSessionServer'
+import {
+  getAttemptPublicPaymentData,
+  transitionPaymentAttempt,
+} from '@/payments/paymentAttempts'
 import { getServerSideURL } from '@/utilities/getURL'
-import { auditLog, buildAuditMeta, enforceRateLimit } from '@/utilities/security'
+import {
+  auditLog,
+  buildAuditMeta,
+  enforceRateLimit,
+  getClientIP,
+  readJSONBodyLimited,
+} from '@/utilities/security'
 import configPromise from '@payload-config'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
@@ -10,6 +23,8 @@ const SUMOPOD_API_KEY = process.env.SUMOPOD_API_KEY || ''
 const SUMOPOD_API_BASE_URL =
   process.env.SUMOPOD_API_BASE_URL || 'https://api-pay-sandbox.sumopod.com'
 const SUMOPOD_PAYMENT_METHOD = process.env.SUMOPOD_PAYMENT_METHOD || 'QRIS'
+const MAX_PROVIDER_RESPONSE_BYTES = 256 * 1024
+const MAX_REQUEST_BODY_BYTES = 16 * 1024
 
 const QRIS_FIELD_NAMES = new Set([
   'payment_number',
@@ -21,7 +36,6 @@ const QRIS_FIELD_NAMES = new Set([
   'qris_payload',
   'qris_string',
 ])
-
 const QRIS_IMAGE_FIELD_NAMES = new Set([
   'qr_code_url',
   'qr_image',
@@ -30,47 +44,8 @@ const QRIS_IMAGE_FIELD_NAMES = new Set([
   'qris_image_url',
 ])
 
-const requireAuthenticatedCustomer = async (req: NextRequest) => {
-  const payload = await getPayload({ config: configPromise })
-  const { user } = await payload.auth({ headers: req.headers })
-
-  if (!user) return null
-
-  const roles = Array.isArray(user.roles) ? user.roles : []
-  const isAllowed = roles.some((role) => ['admin', 'manager', 'finance', 'customer'].includes(role))
-
-  return isAllowed ? { payload, user } : null
-}
-
-const requireOwnedSumoPodPayment = async ({
-  amount,
-  orderID,
-  payload,
-  userID,
-}: {
-  amount: number
-  orderID: string
-  payload: Awaited<ReturnType<typeof getPayload>>
-  userID: number | string
-}) => {
-  const activeSession = await findActiveCheckoutSession(payload, userID)
-  const paymentData = activeSession?.paymentData as any
-
-  if (
-    !activeSession ||
-    activeSession.paymentMethod !== 'pakasir' ||
-    paymentData?.orderID !== orderID ||
-    Number(paymentData?.amount) !== amount
-  ) {
-    return null
-  }
-
-  return activeSession
-}
-
 const findStringByKey = (value: unknown, fieldNames: Set<string>): string | null => {
   if (!value || typeof value !== 'object') return null
-
   if (Array.isArray(value)) {
     for (const item of value) {
       const found = findStringByKey(item, fieldNames)
@@ -80,311 +55,404 @@ const findStringByKey = (value: unknown, fieldNames: Set<string>): string | null
   }
 
   for (const [key, nestedValue] of Object.entries(value)) {
-    if (typeof nestedValue === 'string' && fieldNames.has(key.toLowerCase())) {
-      return nestedValue
-    }
-
+    if (typeof nestedValue === 'string' && fieldNames.has(key.toLowerCase())) return nestedValue
     const found = findStringByKey(nestedValue, fieldNames)
     if (found) return found
   }
-
   return null
 }
 
-const findQrisPayload = (payment: any) => {
-  const direct = findStringByKey(payment, QRIS_FIELD_NAMES)
-  if (direct) return direct
-
-  return findStringByKey(payment, new Set(['qr_code', 'payment_code']))
-}
-
-const findQrisImageUrl = (payment: any) => {
-  const image = findStringByKey(payment, QRIS_IMAGE_FIELD_NAMES)
-  if (image) return image
-
-  const qrCode = findStringByKey(payment, new Set(['qr_code']))
-  return qrCode && /^(https?:|data:image\/)/i.test(qrCode) ? qrCode : null
-}
-
-const normalizeSumoPodPayment = (payment: any) => {
-  const qrisPayload = findQrisPayload(payment)
-  const qrisImageUrl = findQrisImageUrl(payment)
-
-  return {
-    expired_at: payment?.expires_at || payment?.expired_at || null,
-    fee: typeof payment?.fee === 'number' ? payment.fee : 0,
-    payment_id: payment?.payment_id || null,
-    payment_link_url: payment?.payment_link_url || null,
-    payment_number: qrisPayload || payment?.payment_link_url || null,
-    provider: 'sumopod',
-    qris_image_url: qrisImageUrl,
-    qris_payload: qrisPayload,
-    status: payment?.status || 'pending',
-    total_payment: typeof payment?.amount === 'number' ? payment.amount : null,
+const isTrustedSumoPodURL = (value: unknown): value is string => {
+  if (typeof value !== 'string' || !value) return false
+  try {
+    const url = new URL(value)
+    return (
+      url.protocol === 'https:' &&
+      (url.hostname === 'sumopod.com' || url.hostname.endsWith('.sumopod.com'))
+    )
+  } catch {
+    return false
   }
 }
 
+const normalizeSumoPodPayment = (payment: Record<string, any>) => {
+  const rawQrisPayload =
+    findStringByKey(payment, QRIS_FIELD_NAMES) ||
+    findStringByKey(payment, new Set(['qr_code', 'payment_code']))
+  const rawQrisImage = findStringByKey(payment, QRIS_IMAGE_FIELD_NAMES)
+  const paymentLinkURL = isTrustedSumoPodURL(payment.payment_link_url)
+    ? payment.payment_link_url
+    : null
+  const qrisImageURL =
+    typeof rawQrisImage === 'string' &&
+    (/^data:image\/(?:png|jpeg|webp);base64,/i.test(rawQrisImage) ||
+      isTrustedSumoPodURL(rawQrisImage))
+      ? rawQrisImage
+      : null
+
+  return {
+    expired_at: payment.expires_at || payment.expired_at || null,
+    fee: Number.isFinite(Number(payment.fee)) ? Number(payment.fee) : 0,
+    payment_id: payment.payment_id ? String(payment.payment_id) : null,
+    payment_link_url: paymentLinkURL,
+    payment_number: rawQrisPayload || paymentLinkURL,
+    provider: 'sumopod',
+    qris_image_url: qrisImageURL,
+    qris_payload: rawQrisPayload,
+    status: String(payment.status || 'pending').toLowerCase(),
+    total_payment: Number.isFinite(Number(payment.amount)) ? Number(payment.amount) : null,
+  }
+}
+
+const requireAuthenticatedCustomer = async (req: NextRequest) => {
+  const payload = await getPayload({ config: configPromise })
+  const { user } = await payload.auth({ headers: req.headers })
+  if (!user) return null
+  const roles = Array.isArray(user.roles) ? user.roles : []
+  const allowed = roles.some((role) =>
+    ['admin', 'manager', 'finance', 'customer'].includes(String(role)),
+  )
+  return allowed ? { payload, user } : null
+}
+
+const requireOwnedAttempt = async ({
+  payload,
+  userID,
+}: {
+  payload: Awaited<ReturnType<typeof getPayload>>
+  userID: number | string
+}) => {
+  const activeSession = await findActiveCheckoutSession(payload, userID)
+  if (!activeSession || activeSession.paymentMethod !== 'pakasir') return null
+
+  const attempts = await payload.find({
+    collection: 'payment-attempts' as any,
+    depth: 0,
+    limit: 1,
+    overrideAccess: true,
+    pagination: false,
+    where: {
+      and: [
+        { checkoutSession: { equals: activeSession.id } },
+        { customer: { equals: userID } },
+        { provider: { equals: 'sumopod' } },
+      ],
+    } as any,
+  })
+  const attempt = attempts.docs[0] as Record<string, any> | undefined
+  return attempt ? { activeSession, attempt } : null
+}
+
+const validateClientReference = ({
+  amount,
+  attempt,
+  orderID,
+}: {
+  amount: unknown
+  attempt: Record<string, any>
+  orderID: unknown
+}) => {
+  if (orderID !== undefined && String(orderID) !== String(attempt.providerOrderId)) return false
+  if (amount !== undefined && Number(amount) !== Number(attempt.expectedAmount)) return false
+  return true
+}
+
 export async function POST(req: NextRequest) {
+  const rateLimited = enforceRateLimit({
+    key: `sumopod-post:${getClientIP(req)}`,
+    limit: 10,
+    request: req,
+    responseMessage: 'Terlalu banyak permintaan pembayaran.',
+    windowMs: 60_000,
+  })
+  if (rateLimited) return rateLimited
+
   try {
-    const rateLimited = enforceRateLimit({
-      key: `sumopod-post:${req.headers.get('x-forwarded-for') || 'unknown'}`,
-      limit: 20,
-      request: req,
-      responseMessage: 'Too many payment requests',
-      windowMs: 60_000,
-    })
-    if (rateLimited) return rateLimited
-
     const context = await requireAuthenticatedCustomer(req)
-    if (!context) {
+    if (!context) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { payload, user } = context
+    const parsed = await readJSONBodyLimited<Record<string, unknown>>(
+      req,
+      MAX_REQUEST_BODY_BYTES,
+    )
+    if (parsed.response) return parsed.response
+    const body = parsed.data
+    const action = String(body.action || '')
+    if (!['create', 'simulate', 'cancel'].includes(action)) {
+      return NextResponse.json({ error: 'Action pembayaran tidak valid.' }, { status: 400 })
+    }
+
+    const owned = await requireOwnedAttempt({ payload, userID: user.id })
+    if (!owned) return NextResponse.json({ error: 'Payment attempt tidak ditemukan.' }, { status: 409 })
+    const { activeSession, attempt } = owned
+    if (!validateClientReference({ amount: body.amount, attempt, orderID: body.order_id })) {
       auditLog({
         level: 'warn',
-        message: '[Security] Unauthorized SumoPod POST blocked',
-        meta: buildAuditMeta(req),
-      })
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    const { payload: localPayload, user } = context
-
-    const body = await req.json()
-    const { action, order_id, amount, customerName, phone } = body as {
-      action: 'create' | 'simulate' | 'cancel'
-      order_id: string
-      amount: number
-      customerName?: string
-      phone?: string
-    }
-
-    if (!SUMOPOD_API_KEY) {
-      return NextResponse.json({ error: 'Payment gateway is not configured.' }, { status: 503 })
-    }
-
-    if (!action || !order_id || !amount) {
-      return NextResponse.json({ error: 'action, order_id, dan amount wajib diisi.' }, { status: 400 })
-    }
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return NextResponse.json({ error: 'amount tidak valid.' }, { status: 400 })
-    }
-
-    if (!/^[A-Za-z0-9._:-]{1,100}$/.test(order_id)) {
-      return NextResponse.json({ error: 'order_id tidak valid.' }, { status: 400 })
-    }
-
-    const activeSession = await requireOwnedSumoPodPayment({
-      amount,
-      orderID: order_id,
-      payload: localPayload,
-      userID: user.id,
-    })
-
-    if (!activeSession) {
-      auditLog({
-        level: 'warn',
-        message: '[Security] SumoPod payment ownership check failed',
-        meta: buildAuditMeta(req, { action, amount, orderID: order_id, userID: user.id }),
+        logger: payload.logger,
+        message: '[Security] SumoPod client reference mismatch',
+        meta: buildAuditMeta(req, { attemptID: attempt.id, userID: user.id }),
       })
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const paymentData = (activeSession.paymentData as Record<string, any>) || {}
+    const amount = Number(attempt.expectedAmount)
+    const orderID = String(attempt.providerOrderId)
+    const providerData = (attempt.providerData as Record<string, any> | null) || {}
 
     if (action === 'simulate') {
       if (process.env.NODE_ENV === 'production') {
-        auditLog({
-          level: 'warn',
-          message: '[Security] Forbidden SumoPod simulate in production',
-          meta: buildAuditMeta(req, { action, userID: user.id }),
-        })
-        return NextResponse.json({ error: 'simulate is disabled in production.' }, { status: 403 })
+        return NextResponse.json({ error: 'Simulasi dinonaktifkan di production.' }, { status: 403 })
       }
-
-      await localPayload.update({
+      const simulatedResult = await transitionPaymentAttempt({
+        allowedStatuses: ['initiated', 'creating', 'pending'],
+        attemptID: attempt.id,
+        data: {
+          paidAmount: amount,
+          status: 'completed',
+          verifiedAt: new Date().toISOString(),
+        },
+        payload,
+      })
+      const simulated = simulatedResult.attempt
+      if (!simulatedResult.transitioned && simulated.status !== 'completed') {
+        return NextResponse.json({ error: 'Status pembayaran tidak dapat disimulasikan.' }, { status: 409 })
+      }
+      await payload.update({
         collection: 'checkout-sessions' as any,
         id: activeSession.id,
-        data: {
-          paymentData: {
-            ...paymentData,
-            sumopodStatus: 'completed',
-            sumopodSimulatedAt: new Date().toISOString(),
-          },
-        } as any,
+        data: { paymentData: getAttemptPublicPaymentData(simulated) } as any,
         overrideAccess: true,
       })
-
       return NextResponse.json({ transaction: { status: 'completed' } })
     }
 
     if (action === 'cancel') {
-      await localPayload.update({
+      const cancelResult = await transitionPaymentAttempt({
+        allowedStatuses: ['initiated', 'creating', 'pending'],
+        attemptID: attempt.id,
+        data: { status: 'cancelled' },
+        payload,
+      })
+      const cancelled = cancelResult.attempt
+
+      if (['completed', 'finalizing', 'consumed'].includes(String(cancelled.status))) {
+        return NextResponse.json(
+          { error: 'Pembayaran sudah diterima dan tidak dapat dibatalkan.' },
+          { status: 409 },
+        )
+      }
+      if (!cancelResult.transitioned && cancelled.status !== 'cancelled') {
+        return NextResponse.json({ error: 'Pembayaran tidak dapat dibatalkan.' }, { status: 409 })
+      }
+
+      await releaseOwnedCheckoutReservations(
+        payload,
+        user.id,
+        activeSession.sessionId,
+        'Customer cancelled SumoPod payment',
+      )
+      await payload.update({
         collection: 'checkout-sessions' as any,
         id: activeSession.id,
         data: {
-          paymentData: { ...paymentData, sumopodStatus: 'cancelled' },
+          activeKey: null,
+          paymentData: getAttemptPublicPaymentData(cancelled),
+          status: 'cancelled',
         } as any,
         overrideAccess: true,
       })
-
       return NextResponse.json({ transaction: { status: 'cancelled' } })
     }
 
-    if (paymentData.sumopodPaymentLinkURL) {
+    if (!SUMOPOD_API_KEY) {
+      return NextResponse.json({ error: 'Payment gateway belum dikonfigurasi.' }, { status: 503 })
+    }
+    if (['failed', 'expired', 'cancelled'].includes(String(attempt.status))) {
+      return NextResponse.json(
+        { error: 'Sesi pembayaran sudah tidak aktif. Mulai checkout baru.' },
+        { status: 409 },
+      )
+    }
+    if (providerData.paymentLinkURL) {
       return NextResponse.json({
         payment: normalizeSumoPodPayment({
           amount,
-          expires_at: paymentData.sumopodExpiresAt,
-          fee: paymentData.sumopodFee,
-          payment_id: paymentData.sumopodPaymentID,
-          payment_link_url: paymentData.sumopodPaymentLinkURL,
-          qris_image_url: paymentData.sumopodQrisImageURL,
-          qris_payload: paymentData.sumopodQrisPayload,
-          status: paymentData.sumopodStatus || 'pending',
+          expires_at: providerData.expiresAt,
+          fee: providerData.fee,
+          payment_id: attempt.providerPaymentId,
+          payment_link_url: providerData.paymentLinkURL,
+          qris_image_url: providerData.qrisImageURL,
+          qris_payload: providerData.qrisPayload,
+          status: attempt.status,
         }),
       })
     }
 
-    auditLog({
-      logger: console,
-      message: '[Audit] SumoPod POST access',
-      meta: buildAuditMeta(req, { action, amount, orderID: order_id, userID: user.id }),
+    if (['completed', 'finalizing', 'consumed'].includes(String(attempt.status))) {
+      return NextResponse.json({ error: 'Pembayaran sudah diterima.' }, { status: 409 })
+    }
+
+    const claim = await transitionPaymentAttempt({
+      allowedStatuses: ['initiated'],
+      attemptID: attempt.id,
+      data: { status: 'creating' },
+      payload,
     })
-
-    const checkoutURL = `${getServerSideURL()}/checkout`
-    const successReturnURL = `${checkoutURL}?sumopod_return=success&order_id=${encodeURIComponent(order_id)}`
-    const cancelReturnURL = `${checkoutURL}?sumopod_return=cancel&order_id=${encodeURIComponent(order_id)}`
-    const response = await fetch(`${SUMOPOD_API_BASE_URL.replace(/\/$/, '')}/api/v1/payments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': SUMOPOD_API_KEY,
-      },
-      body: JSON.stringify({
-        amount,
-        cancel_return_url: cancelReturnURL,
-        currency: 'IDR',
-        expires_in_hours: 1,
-        order_id,
-        payment_method_type_code: SUMOPOD_PAYMENT_METHOD,
-        success_return_url: successReturnURL,
-      }),
-    })
-
-    const data = await response.json().catch(() => null)
-
-    if (!response.ok || !data?.payment_link_url) {
+    if (!claim.transitioned) {
       return NextResponse.json(
-        { error: data?.message || data?.error || 'Gagal membuat pembayaran SumoPod.' },
-        { status: response.status },
+        { error: 'Pembuatan link pembayaran sedang diproses. Coba lagi sebentar.' },
+        { status: 409 },
       )
     }
 
+    const resetCreateClaim = () =>
+      transitionPaymentAttempt({
+        allowedStatuses: ['creating'],
+        attemptID: attempt.id,
+        data: { status: 'initiated' },
+        payload,
+      }).catch(() => undefined)
+
+    const checkoutURL = `${getServerSideURL()}/checkout`
+    const successReturnURL = `${checkoutURL}?sumopod_return=success&order_id=${encodeURIComponent(orderID)}`
+    const cancelReturnURL = `${checkoutURL}?sumopod_return=cancel&order_id=${encodeURIComponent(orderID)}`
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 12_000)
+    let response: Response
+    try {
+      response = await fetch(`${SUMOPOD_API_BASE_URL.replace(/\/$/, '')}/api/v1/payments`, {
+        body: JSON.stringify({
+          amount,
+          cancel_return_url: cancelReturnURL,
+          currency: 'IDR',
+          expires_in_hours: 1,
+          order_id: orderID,
+          payment_method_type_code: SUMOPOD_PAYMENT_METHOD,
+          success_return_url: successReturnURL,
+        }),
+        headers: { 'Content-Type': 'application/json', 'X-Api-Key': SUMOPOD_API_KEY },
+        method: 'POST',
+        signal: controller.signal,
+      })
+    } catch (error) {
+      await resetCreateClaim()
+      throw error
+    } finally {
+      clearTimeout(timeout)
+    }
+
+    const responseText = await response.text()
+    if (Buffer.byteLength(responseText, 'utf8') > MAX_PROVIDER_RESPONSE_BYTES) {
+      await resetCreateClaim()
+      throw new Error('Respons SumoPod terlalu besar.')
+    }
+    let data: Record<string, any>
+    try {
+      data = responseText ? (JSON.parse(responseText) as Record<string, any>) : {}
+    } catch {
+      await resetCreateClaim()
+      throw new Error('Respons SumoPod bukan JSON yang valid.')
+    }
+    if (!response.ok) {
+      await resetCreateClaim()
+      return NextResponse.json(
+        { error: data.message || data.error || 'Gagal membuat pembayaran SumoPod.' },
+        { status: response.status >= 400 && response.status < 500 ? 502 : response.status },
+      )
+    }
+    if (
+      !isTrustedSumoPodURL(data.payment_link_url) ||
+      (data.order_id && String(data.order_id) !== orderID) ||
+      (data.amount !== undefined && Number(data.amount) !== amount) ||
+      (data.currency && String(data.currency).toUpperCase() !== 'IDR')
+    ) {
+      await resetCreateClaim()
+      throw new Error('Respons SumoPod tidak cocok dengan payment attempt.')
+    }
+
     const normalized = normalizeSumoPodPayment(data)
-    await localPayload.update({
+    const savedAttempt = await transitionPaymentAttempt({
+      allowedStatuses: ['creating'],
+      attemptID: attempt.id,
+      data: {
+        providerData: {
+          expiresAt: normalized.expired_at,
+          fee: normalized.fee,
+          paymentLinkURL: normalized.payment_link_url,
+          qrisImageURL: normalized.qris_image_url,
+          qrisPayload: normalized.qris_payload,
+        },
+        providerPaymentId: normalized.payment_id,
+        status: 'pending',
+      },
+      payload,
+    })
+    const updatedAttempt = savedAttempt.attempt
+    if (
+      !savedAttempt.transitioned &&
+      !['completed', 'finalizing', 'consumed'].includes(String(updatedAttempt.status))
+    ) {
+      throw new Error('Status payment attempt berubah saat link dibuat.')
+    }
+    await payload.update({
       collection: 'checkout-sessions' as any,
       id: activeSession.id,
-      data: {
-        paymentData: {
-          ...paymentData,
-          sumopodExpiresAt: normalized.expired_at,
-          sumopodFee: normalized.fee,
-          sumopodPaymentID: normalized.payment_id,
-          sumopodPaymentLinkURL: normalized.payment_link_url,
-          sumopodQrisImageURL: normalized.qris_image_url,
-          sumopodQrisPayload: normalized.qris_payload,
-          sumopodStatus: normalized.status,
-        },
-      } as any,
+      data: { paymentData: getAttemptPublicPaymentData(updatedAttempt), status: 'pending' } as any,
       overrideAccess: true,
     })
 
     void notifyPendingPayment({
       amount,
       currency: 'IDR',
-      customerName: customerName || user.name || undefined,
-      orderCode: order_id,
+      customerName: user.name || undefined,
+      orderCode: orderID,
       pendingPaymentUrl: normalized.payment_link_url || checkoutURL,
-      phone: phone || user.phone || undefined,
-      sessionExpiry: '10:00',
-    })
-      .then((result) => {
-        if (!result?.success) console.error('[SumoPod pending WA] failed:', result)
-      })
-      .catch((error) => {
-        console.error('[SumoPod pending WA] error:', error)
-      })
+      phone: user.phone || undefined,
+      sessionExpiry: '60:00',
+    }).catch((error) => payload.logger.warn({ error }, '[SumoPod pending WA] failed'))
 
-    return NextResponse.json({ payment: normalized }, { status: response.status })
-  } catch (err) {
-    console.error('[SumoPod proxy] error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ payment: normalized })
+  } catch (error) {
+    console.error('[SumoPod proxy] error:', error)
+    return NextResponse.json({ error: 'Gagal memproses pembayaran.' }, { status: 500 })
   }
 }
 
 export async function GET(req: NextRequest) {
+  const rateLimited = enforceRateLimit({
+    key: `sumopod-get:${getClientIP(req)}`,
+    limit: 30,
+    request: req,
+    responseMessage: 'Terlalu banyak pemeriksaan status pembayaran.',
+    windowMs: 60_000,
+  })
+  if (rateLimited) return rateLimited
+
   try {
-    const rateLimited = enforceRateLimit({
-      key: `sumopod-get:${req.headers.get('x-forwarded-for') || 'unknown'}`,
-      limit: 30,
-      request: req,
-      responseMessage: 'Too many payment status checks',
-      windowMs: 60_000,
-    })
-    if (rateLimited) return rateLimited
-
     const context = await requireAuthenticatedCustomer(req)
-    if (!context) {
-      auditLog({
-        level: 'warn',
-        message: '[Security] Unauthorized SumoPod GET blocked',
-        meta: buildAuditMeta(req),
+    if (!context) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const owned = await requireOwnedAttempt({ payload: context.payload, userID: context.user.id })
+    if (!owned) return NextResponse.json({ error: 'Payment attempt tidak ditemukan.' }, { status: 404 })
+
+    const params = new URL(req.url).searchParams
+    if (
+      !validateClientReference({
+        amount: params.get('amount') ?? undefined,
+        attempt: owned.attempt,
+        orderID: params.get('order_id') ?? undefined,
       })
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    const { payload: localPayload, user } = context
-
-    const { searchParams } = new URL(req.url)
-    const order_id = searchParams.get('order_id')
-    const amountParam = searchParams.get('amount')
-
-    if (!order_id || !amountParam) {
-      return NextResponse.json({ error: 'order_id dan amount wajib diisi.' }, { status: 400 })
-    }
-
-    const amount = Number(amountParam)
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return NextResponse.json({ error: 'amount tidak valid.' }, { status: 400 })
-    }
-
-    const activeSession = await requireOwnedSumoPodPayment({
-      amount,
-      orderID: order_id,
-      payload: localPayload,
-      userID: user.id,
-    })
-
-    if (!activeSession) {
-      auditLog({
-        level: 'warn',
-        message: '[Security] SumoPod status ownership check failed',
-        meta: buildAuditMeta(req, { amount, orderID: order_id, userID: user.id }),
-      })
+    ) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    auditLog({
-      message: '[Audit] SumoPod GET access',
-      meta: buildAuditMeta(req, { amount, orderID: order_id, userID: user.id }),
-    })
-
-    const paymentData = (activeSession.paymentData as Record<string, any>) || {}
     return NextResponse.json({
       transaction: {
-        payment_id: paymentData.sumopodPaymentID || null,
-        status: paymentData.sumopodStatus || 'pending',
+        payment_id: owned.attempt.providerPaymentId || null,
+        status: owned.attempt.status === 'consumed' ? 'completed' : owned.attempt.status,
       },
     })
-  } catch (err) {
-    console.error('[SumoPod proxy] error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  } catch (error) {
+    console.error('[SumoPod status] error:', error)
+    return NextResponse.json({ error: 'Gagal memeriksa status pembayaran.' }, { status: 500 })
   }
 }

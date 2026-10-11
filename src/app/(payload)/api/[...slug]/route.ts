@@ -9,7 +9,7 @@ import {
   REST_PUT,
 } from '@payloadcms/next/routes'
 import { getPayload } from 'payload'
-import { auditLog, buildAuditMeta, enforceRateLimit } from '@/utilities/security'
+import { auditLog, buildAuditMeta, enforceRateLimit, getClientIP } from '@/utilities/security'
 
 const restGet = REST_GET(config)
 const restPost = REST_POST(config)
@@ -18,7 +18,7 @@ const restPatch = REST_PATCH(config)
 const restPut = REST_PUT(config)
 
 const isSensitiveAuthPath = (pathname: string) =>
-  ['/api/users/login', '/api/users/forgot-password', '/api/users/reset-password'].includes(pathname)
+  ['/api/users', '/api/users/login', '/api/users/forgot-password', '/api/users/reset-password'].includes(pathname)
 
 const logRestAccess = async (request: Request) => {
   const pathname = new URL(request.url).pathname
@@ -57,11 +57,11 @@ const maybeRateLimitRest = (request: Request) => {
   }
 
   return enforceRateLimit({
-    key: `rest-auth:${pathname}:${request.headers.get('x-forwarded-for') || 'unknown'}`,
-    limit: pathname.endsWith('/login') ? 10 : 6,
+    key: `rest-auth:${pathname}:${getClientIP(request)}`,
+    limit: pathname === '/api/users' ? 5 : pathname.endsWith('/login') ? 10 : 6,
     request,
     responseMessage: 'Too many authentication requests',
-    windowMs: 10 * 60_000,
+    windowMs: pathname === '/api/users' ? 60 * 60_000 : 10 * 60_000,
   })
 }
 

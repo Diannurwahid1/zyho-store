@@ -3,7 +3,7 @@ import configPromise from '@payload-config'
 import { NowPaymentsSDK } from '@nowpaymentsio/nowpayments-sdk-nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
-import { auditLog, buildAuditMeta, enforceRateLimit } from '@/utilities/security'
+import { auditLog, buildAuditMeta, enforceRateLimit, getClientIP } from '@/utilities/security'
 
 const createSDK = () =>
   new NowPaymentsSDK({
@@ -16,7 +16,7 @@ const createSDK = () =>
 export async function GET(req: NextRequest) {
   try {
     const rateLimited = enforceRateLimit({
-      key: `nowpayments-get:${req.headers.get('x-forwarded-for') || 'unknown'}`,
+      key: `nowpayments-get:${getClientIP(req)}`,
       limit: 30,
       request: req,
       responseMessage: 'Too many crypto payment checks',
@@ -44,12 +44,7 @@ export async function GET(req: NextRequest) {
     }
 
     const activeSession = await findActiveCheckoutSession(payload, user.id)
-    const paymentData = activeSession?.paymentData as any
-    if (
-      !activeSession ||
-      activeSession.paymentMethod !== 'nowpayments' ||
-      String(paymentData?.nowpaymentsPaymentID || '') !== paymentId
-    ) {
+    if (!activeSession || activeSession.paymentMethod !== 'nowpayments') {
       auditLog({
         level: 'warn',
         logger: payload.logger,
@@ -58,6 +53,23 @@ export async function GET(req: NextRequest) {
       })
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    const attempts = await payload.find({
+      collection: 'payment-attempts' as any,
+      depth: 0,
+      limit: 1,
+      overrideAccess: true,
+      pagination: false,
+      where: {
+        and: [
+          { checkoutSession: { equals: activeSession.id } },
+          { customer: { equals: user.id } },
+          { provider: { equals: 'nowpayments' } },
+          { providerPaymentId: { equals: paymentId } },
+        ],
+      } as any,
+    })
+    const attempt = attempts.docs[0] as Record<string, any> | undefined
+    if (!attempt) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     auditLog({
       logger: payload.logger,
@@ -68,7 +80,8 @@ export async function GET(req: NextRequest) {
     const sdk = createSDK()
     const payment = await sdk.getPaymentStatus(paymentId)
 
-    return NextResponse.json(payment)
+    const status = String(payment.status || payment.payment_status || 'unknown').toLowerCase()
+    return NextResponse.json({ payment_status: status, status })
   } catch (error) {
     console.error('[NOWPayments] status error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

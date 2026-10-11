@@ -1,6 +1,7 @@
 import { Grid } from '@/components/Grid'
 import { ProductGridItem } from '@/components/ProductGridItem'
 import { sortProducts } from '@/utilities/sortProducts'
+import { hydrateProductAvailableInventory } from '@/lib/stock'
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
 
@@ -87,16 +88,21 @@ export default async function ShopPage({ searchParams }: Props) {
         }
       : {}),
   })
+  const stockAwareProducts = await Promise.all(
+    products.docs.map((product) => hydrateProductAvailableInventory(payload, product)),
+  )
 
   return (
     <div className="container py-1 md:py-8">
-      {products.docs?.length === 0 ? (
+      {stockAwareProducts.length === 0 ? (
         <div className="rounded-3xl border bg-card p-10 text-center text-muted-foreground">
           Produk belum ditemukan. Coba keyword atau filter lain.
         </div>
       ) : (
         <Grid className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-6">
-          {(normalizedSort ? products.docs : sortProducts(products.docs)).map((product) => <ProductGridItem key={product.id} product={product} />)}
+          {(normalizedSort ? stockAwareProducts : sortProducts(stockAwareProducts)).map((product) => (
+            <ProductGridItem key={product.id} product={product} />
+          ))}
         </Grid>
       )}
     </div>

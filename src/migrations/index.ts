@@ -12,6 +12,7 @@ import * as migration_20260805_113000_digital_stock_redeem from './20260805_1130
 import * as migration_20260808_120000_products_bundle_config from './20260808_120000_products_bundle_config';
 import * as migration_20260808_190145_products_native_bundle_fields from './20260808_190145_products_native_bundle_fields';
 import * as migration_20260809_041500_order_bundle_item_snapshots from './20260809_041500_order_bundle_item_snapshots';
+import * as migration_20260823_010000_security_hardening from './20260823_010000_security_hardening';
 
 export const migrations = [
   {
@@ -83,5 +84,10 @@ export const migrations = [
     up: migration_20260809_041500_order_bundle_item_snapshots.up,
     down: migration_20260809_041500_order_bundle_item_snapshots.down,
     name: '20260809_041500_order_bundle_item_snapshots',
+  },
+  {
+    up: migration_20260823_010000_security_hardening.up,
+    down: migration_20260823_010000_security_hardening.down,
+    name: '20260823_010000_security_hardening',
   },
 ];

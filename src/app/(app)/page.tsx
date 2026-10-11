@@ -7,6 +7,7 @@ import { PromoSection } from '@/components/PromoSection'
 import { Testimonials } from '@/components/Testimonials'
 import { homeStaticData } from '@/endpoints/seed/home-static'
 import { getNormalizedBundleItems } from '@/lib/bundles'
+import { hydrateProductAvailableInventory } from '@/lib/stock'
 import { getProductArtworkImages } from '@/lib/productArtwork'
 import { generateMeta } from '@/utilities/generateMeta'
 import { getClientLanguage } from '@/utilities/getClientLanguage'
@@ -74,7 +75,11 @@ export default async function Page() {
     },
     limit: 100,
   })
-  const products = sortProducts(rawProducts).slice(0, 6)
+  const products = await Promise.all(
+    sortProducts(rawProducts)
+      .slice(0, 6)
+      .map((product) => hydrateProductAvailableInventory(payload, product)),
+  )
 
   // 4. Get testimonials
   const { docs: testimonials } = await payload.find({

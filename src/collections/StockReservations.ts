@@ -11,7 +11,7 @@ import type { CollectionConfig } from 'payload'
  *  3. `released`  — diubah ke released jika pembayaran expired / dibatalkan.
  *                   Stok dikembalikan ke pool.
  *
- * Reservasi pending otomatis expire setelah 10 menit (dihandle oleh cron endpoint).
+ * Reservasi pending otomatis expire setelah 60 menit (dihandle oleh cron endpoint).
  */
 export const StockReservations: CollectionConfig = {
   slug: 'stock-reservations',
@@ -33,6 +33,7 @@ export const StockReservations: CollectionConfig = {
       type: 'text',
       required: true,
       index: true,
+      unique: true,
       admin: {
         description: 'ID unik reservasi (biasanya = paymentIntentID / cartID + timestamp)',
       },
@@ -76,7 +77,7 @@ export const StockReservations: CollectionConfig = {
       required: true,
       index: true,
       admin: {
-        description: 'Waktu reservasi expired. Default: 10 menit dari waktu dibuat.',
+        description: 'Waktu reservasi expired. Default: 60 menit dari waktu dibuat.',
         date: {
           displayFormat: 'dd/MM/yyyy HH:mm:ss',
         },

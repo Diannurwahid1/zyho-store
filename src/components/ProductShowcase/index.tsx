@@ -191,7 +191,7 @@ export const ProductShowcase: React.FC<ProductShowcaseProps> = ({
         </div>
 
         <div className="text-center">
-          <a
+          <Link
             href="/shop"
             className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-2.5 text-sm font-semibold text-card-foreground transition-all hover:bg-accent"
           >
@@ -204,7 +204,7 @@ export const ProductShowcase: React.FC<ProductShowcaseProps> = ({
                 strokeWidth={2}
               />
             </svg>
-          </a>
+          </Link>
         </div>
       </div>
     </section>

@@ -3,10 +3,16 @@ import {
     findActiveCheckoutSession,
     releaseOwnedCheckoutReservations,
 } from '@/lib/checkoutSessionServer'
-import { enforceRateLimit } from '@/utilities/security'
+import { enforceRateLimit, readJSONBodyLimited } from '@/utilities/security'
+import {
+  getAttemptPublicPaymentData,
+  transitionPaymentAttempt,
+} from '@/payments/paymentAttempts'
 import configPromise from '@payload-config'
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayload } from 'payload'
+
+const MAX_BODY_BYTES = 16 * 1024
 
 const getContext = async (req: NextRequest) => {
   const payload = await getPayload({ config: configPromise })
@@ -112,7 +118,9 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const body = await req.json().catch(() => ({}))
+  const parsed = await readJSONBodyLimited<Record<string, any>>(req, MAX_BODY_BYTES)
+  if (parsed.response) return parsed.response
+  const body = parsed.data
   if (!body.cartId || (typeof body.cartId !== 'string' && typeof body.cartId !== 'number')) {
     return NextResponse.json({ error: 'Keranjang checkout tidak valid.' }, { status: 400 })
   }
@@ -180,16 +188,36 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const { payload, user } = await getContext(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const body = await req.json().catch(() => ({}))
+  const parsed = await readJSONBodyLimited<Record<string, any>>(req, MAX_BODY_BYTES)
+  if (parsed.response) return parsed.response
+  const body = parsed.data
   const active = await findActiveCheckoutSession(payload, user.id)
   if (!active || active.sessionId !== body.sessionId) {
     return NextResponse.json({ error: 'Sesi checkout tidak aktif.' }, { status: 409 })
+  }
+  const attempts = await payload.find({
+    collection: 'payment-attempts' as any,
+    depth: 0,
+    limit: 1,
+    overrideAccess: true,
+    pagination: false,
+    where: {
+      and: [
+        { checkoutSession: { equals: active.id } },
+        { customer: { equals: user.id } },
+      ],
+    } as any,
+  })
+  const attempt = attempts.docs[0] as Record<string, any> | undefined
+  if (!attempt) {
+    return NextResponse.json({ error: 'Pembayaran belum dibuat oleh server.' }, { status: 409 })
   }
   const session = await payload.update({
     collection: 'checkout-sessions' as any,
     id: active.id,
     data: {
-      paymentData: body.paymentData,
+      paymentAttempt: attempt.id,
+      paymentData: getAttemptPublicPaymentData(attempt),
       reservationId: active.sessionId,
       status: 'pending',
     } as any,
@@ -201,7 +229,9 @@ export async function PUT(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const { payload, user } = await getContext(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const body = await req.json().catch(() => ({}))
+  const parsed = await readJSONBodyLimited<Record<string, any>>(req, MAX_BODY_BYTES)
+  if (parsed.response) return parsed.response
+  const body = parsed.data
   const active = await findActiveCheckoutSession(payload, user.id)
   if (!active || active.sessionId !== body.sessionId) {
     return NextResponse.json({ error: 'Sesi checkout tidak aktif.' }, { status: 409 })
@@ -228,11 +258,49 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const { payload, user } = await getContext(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const body = await req.json().catch(() => ({}))
+  const parsed = await readJSONBodyLimited<Record<string, any>>(req, MAX_BODY_BYTES)
+  if (parsed.response) return parsed.response
+  const body = parsed.data
   const active = await findActiveCheckoutSession(payload, user.id)
   if (!active || (body.sessionId && active.sessionId !== body.sessionId)) {
     return NextResponse.json({ error: 'Sesi checkout tidak aktif.' }, { status: 409 })
   }
+
+  const attempts = await payload.find({
+    collection: 'payment-attempts' as any,
+    depth: 0,
+    limit: 1,
+    overrideAccess: true,
+    pagination: false,
+    where: {
+      and: [
+        { checkoutSession: { equals: active.id } },
+        { customer: { equals: user.id } },
+      ],
+    } as any,
+  })
+  let attempt = attempts.docs[0] as Record<string, any> | undefined
+
+  if (attempt) {
+    const result = await transitionPaymentAttempt({
+      allowedStatuses: ['initiated', 'creating', 'pending'],
+      attemptID: attempt.id,
+      data: { status: 'cancelled' },
+      payload,
+    })
+    attempt = result.attempt
+
+    if (['completed', 'finalizing', 'consumed'].includes(String(attempt.status))) {
+      return NextResponse.json(
+        { error: 'Pembayaran sudah diterima dan checkout tidak dapat dibatalkan.' },
+        { status: 409 },
+      )
+    }
+    if (!result.transitioned && attempt.status !== 'cancelled') {
+      return NextResponse.json({ error: 'Checkout tidak dapat dibatalkan.' }, { status: 409 })
+    }
+  }
+
   await releaseOwnedCheckoutReservations(
     payload,
     user.id,
@@ -242,7 +310,11 @@ export async function DELETE(req: NextRequest) {
   await payload.update({
     collection: 'checkout-sessions' as any,
     id: active.id,
-    data: { activeKey: null, status: 'cancelled' } as any,
+    data: {
+      activeKey: null,
+      ...(attempt ? { paymentData: getAttemptPublicPaymentData(attempt) } : {}),
+      status: 'cancelled',
+    } as any,
     overrideAccess: true,
   })
   return NextResponse.json({ success: true })

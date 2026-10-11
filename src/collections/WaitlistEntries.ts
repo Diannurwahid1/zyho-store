@@ -4,7 +4,7 @@ import type { CollectionConfig } from 'payload'
 export const WaitlistEntries: CollectionConfig = {
   slug: 'waitlist-entries',
   access: {
-    create: () => true, // Public — anyone can join
+    create: staffOnly,
     delete: adminOrManager,
     read: staffOnly,
     update: adminOrManager,
@@ -28,18 +28,13 @@ export const WaitlistEntries: CollectionConfig = {
         if (!waitlistId) return
 
         try {
-          const waitlist = await req.payload.findByID({
-            collection: 'waitlists',
-            id: waitlistId,
-            overrideAccess: true,
-          })
-          await req.payload.update({
-            collection: 'waitlists',
-            id: waitlistId,
+          await req.payload.db.updateOne({
+            collection: 'waitlists' as any,
             data: {
-              totalEntries: (waitlist.totalEntries || 0) + 1,
+              totalEntries: { $inc: 1 },
             },
-            overrideAccess: true,
+            req,
+            where: { id: { equals: waitlistId } },
           })
         } catch (err) {
           req.payload.logger.warn({ err }, '[WaitlistEntry] Failed to update totalEntries')

@@ -1,4 +1,3 @@
-import CryptoJS from 'crypto-js'
 import type { CollectionConfig } from 'payload'
 
 import { adminOnly } from '@/access/adminOnly'
@@ -7,14 +6,9 @@ import { adminOrSelf } from '@/access/adminOrSelf'
 import { checkRole } from '@/access/utilities'
 import { getMemberTier } from '@/lib/member'
 import { awardSignupVoucherCampaignAfterChange } from './hooks/awardSignupVoucherCampaign'
+import { decryptSensitiveValue, hashGoogleID } from '@/utilities/sensitiveData'
 
 import { ensureFirstUserIsAdmin } from './hooks/ensureFirstUserIsAdmin'
-
-const getEncryptionKey = () => {
-  const encryptionKey = process.env.ENCRYPTION_KEY
-  if (!encryptionKey) throw new Error('ENCRYPTION_KEY is required.')
-  return encryptionKey
-}
 
 export const Users: CollectionConfig = {
   slug: 'users',
@@ -106,6 +100,10 @@ export const Users: CollectionConfig = {
     {
       name: 'googleId',
       type: 'text',
+      access: {
+        create: adminOnlyFieldAccess,
+        update: adminOnlyFieldAccess,
+      },
       unique: true,
       index: true,
       admin: {
@@ -115,8 +113,8 @@ export const Users: CollectionConfig = {
         beforeChange: [
           ({ value }) => {
             if (value && typeof value === 'string') {
-              const encrypted = CryptoJS.AES.encrypt(value, getEncryptionKey()).toString()
-              return encrypted
+              if (value.startsWith('gid:')) return value
+              return hashGoogleID(value)
             }
             return value
           },
@@ -124,11 +122,9 @@ export const Users: CollectionConfig = {
         afterRead: [
           ({ value }) => {
             if (value && typeof value === 'string') {
-              const decrypted = CryptoJS.AES.decrypt(
-                value,
-                getEncryptionKey(),
-              ).toString(CryptoJS.enc.Utf8)
-              return decrypted
+              if (value.startsWith('gid:')) return 'connected'
+              const decrypted = decryptSensitiveValue(value)
+              return decrypted === value ? 'connected' : decrypted
             }
             return value
           },
@@ -138,6 +134,10 @@ export const Users: CollectionConfig = {
     {
       name: 'googleAvatarURL',
       type: 'text',
+      access: {
+        create: adminOnlyFieldAccess,
+        update: adminOnlyFieldAccess,
+      },
       admin: {
         position: 'sidebar',
       },
@@ -154,12 +154,20 @@ export const Users: CollectionConfig = {
     {
       name: 'status',
       type: 'select',
+      access: {
+        create: adminOnlyFieldAccess,
+        update: adminOnlyFieldAccess,
+      },
       defaultValue: 'active',
       options: ['active', 'inactive', 'blocked'],
     },
     {
       name: 'memberTier',
       type: 'select',
+      access: {
+        create: adminOnlyFieldAccess,
+        update: adminOnlyFieldAccess,
+      },
       defaultValue: 'bronze',
       admin: {
         position: 'sidebar',
@@ -170,6 +178,10 @@ export const Users: CollectionConfig = {
     {
       name: 'totalSpentIDR',
       type: 'number',
+      access: {
+        create: adminOnlyFieldAccess,
+        update: adminOnlyFieldAccess,
+      },
       defaultValue: 0,
       admin: {
         position: 'sidebar',
@@ -181,6 +193,10 @@ export const Users: CollectionConfig = {
     {
       name: 'membershipPoints',
       type: 'number',
+      access: {
+        create: adminOnlyFieldAccess,
+        update: adminOnlyFieldAccess,
+      },
       defaultValue: 0,
       min: 0,
       label: 'Membership Points',
@@ -189,6 +205,10 @@ export const Users: CollectionConfig = {
     {
       name: 'memberSince',
       type: 'date',
+      access: {
+        create: adminOnlyFieldAccess,
+        update: adminOnlyFieldAccess,
+      },
       admin: {
         position: 'sidebar',
         readOnly: true,

@@ -1,4 +1,4 @@
-import { addStock } from '@/lib/stock'
+import { withPayloadTransaction } from '@/utilities/payloadTransaction'
 import type { PayloadRequest } from 'payload'
 
 type ManualOrderInput = {
@@ -154,10 +154,6 @@ const assignSpecificDigitalStockUnitToOrder = async ({
   unit: Record<string, any>
   variantDoc: Record<string, any> | null
 }) => {
-  if (unit.status !== 'available') {
-    throw new Error('Digital stock unit ini sudah tidak available.')
-  }
-
   const updatedUnit = await req.payload.update({
     collection: 'digital-stock-units',
     id: unit.id,
@@ -181,7 +177,7 @@ const assignSpecificDigitalStockUnitToOrder = async ({
           product: product.id,
           productTitle: product.title,
           quantity: 1,
-          units: [buildManualSnapshotUnit(updatedUnit as Record<string, any>)],
+          units: [buildManualSnapshotUnit({ ...unit, ...(updatedUnit as Record<string, any>) })],
           variant: variantDoc ? String(variantDoc.id) : undefined,
           variantTitle: variantDoc?.title || undefined,
         },
@@ -254,27 +250,31 @@ export const createManualOrderFromDigitalStockUnit = async ({
     variant: variantDoc,
   })
 
-  const customer = (await findOrCreateManualOrderUser({
-    email: normalizedEmail,
-    phone: normalizedPhone,
-    req,
-  })) as Record<string, any>
-
-  const customerID = normalizeRelationID(customer)
   const variantID = variantDoc ? normalizeRelationID(variantDoc) : null
   const paymentReference = `MANUAL-${Date.now()}-${unit.id}`
 
-  let createdOrder: Record<string, any> | null = null
-  let createdTransaction: Record<string, any> | null = null
-  let createdPaymentTransaction: Record<string, any> | null = null
-  let unitAssigned = false
-  let inventoryReduced = false
+  return withPayloadTransaction(req, async () => {
+    const claimID = `manual-order:${crypto.randomUUID()}`
+    const claimedUnit = await req.payload.db.updateOne({
+      collection: 'digital-stock-units',
+      data: { reservationId: claimID, status: 'reserved' },
+      req,
+      where: {
+        and: [{ id: { equals: unit.id } }, { status: { equals: 'available' } }],
+      } as any,
+    })
+    if (!claimedUnit) throw new Error('Digital stock unit sedang diproses atau sudah digunakan.')
 
-  try {
-    createdOrder = (await req.payload.create({
+    const customer = (await findOrCreateManualOrderUser({
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      req,
+    })) as Record<string, any>
+    const customerID = normalizeRelationID(customer)
+
+    const createdOrder = (await req.payload.create({
       collection: 'orders',
       data: {
-        accessToken: crypto.randomUUID(),
         amount,
         currency,
         customer: customerID,
@@ -307,24 +307,7 @@ export const createManualOrderFromDigitalStockUnit = async ({
       unit,
       variantDoc,
     })
-    unitAssigned = true
-
-    const stockResult = await addStock(req.payload, {
-      notes: `Manual order dari digital stock unit ${unit.unitCode || unit.id}`,
-      performedById: req.user?.id || null,
-      productId: product.id,
-      quantity: -1,
-      referenceId: paymentReference,
-      type: 'out',
-      variantId: variantDoc ? String(variantDoc.id) : null,
-    })
-
-    if (!stockResult.success) {
-      throw new Error(stockResult.error || 'Gagal mengurangi stok produk.')
-    }
-    inventoryReduced = true
-
-    createdPaymentTransaction = (await req.payload.create({
+    await req.payload.create({
       collection: 'payment-transactions',
       context: {
         skipPaymentTransactionNotifications: true,
@@ -344,9 +327,9 @@ export const createManualOrderFromDigitalStockUnit = async ({
       } as any,
       overrideAccess: true,
       req,
-    })) as Record<string, any>
+    })
 
-    createdTransaction = (await req.payload.create({
+    const createdTransaction = (await req.payload.create({
       collection: 'transactions',
       data: {
         amount,
@@ -403,62 +386,5 @@ export const createManualOrderFromDigitalStockUnit = async ({
       unitCode: unit.unitCode || String(unit.id),
       userId: customerID,
     }
-  } catch (error) {
-    if (inventoryReduced) {
-      await addStock(req.payload, {
-        notes: `Rollback manual order ${paymentReference}`,
-        performedById: req.user?.id || null,
-        productId: product.id,
-        quantity: 1,
-        referenceId: `rollback:${paymentReference}`,
-        type: 'adjust',
-        variantId: variantDoc ? String(variantDoc.id) : null,
-      }).catch(() => null)
-    }
-
-    if (unitAssigned) {
-      await req.payload.update({
-        collection: 'digital-stock-units',
-        id: unit.id,
-        data: {
-          assignedAt: null,
-          customer: null,
-          order: null,
-          reservationId: null,
-          status: 'available',
-        } as any,
-        overrideAccess: true,
-        req,
-      }).catch(() => null)
-    }
-
-    if (createdTransaction?.id) {
-      await req.payload.delete({
-        collection: 'transactions',
-        id: createdTransaction.id,
-        overrideAccess: true,
-        req,
-      }).catch(() => null)
-    }
-
-    if (createdPaymentTransaction?.id) {
-      await req.payload.delete({
-        collection: 'payment-transactions',
-        id: createdPaymentTransaction.id,
-        overrideAccess: true,
-        req,
-      }).catch(() => null)
-    }
-
-    if (createdOrder?.id) {
-      await req.payload.delete({
-        collection: 'orders',
-        id: createdOrder.id,
-        overrideAccess: true,
-        req,
-      }).catch(() => null)
-    }
-
-    throw error
-  }
+  })
 }

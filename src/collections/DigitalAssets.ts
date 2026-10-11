@@ -1,5 +1,6 @@
 import { adminOrManager, staffOnly } from '@/access/roles'
 import type { CollectionConfig } from 'payload'
+import { protectMediaFile } from '@/utilities/privateMedia'
 
 export const DigitalAssets: CollectionConfig = {
   slug: 'digital-assets',
@@ -13,6 +14,15 @@ export const DigitalAssets: CollectionConfig = {
     group: 'Digital Commerce',
     useAsTitle: 'fileName',
     defaultColumns: ['fileName', 'product', 'version', 'status', 'protected'],
+  },
+  hooks: {
+    afterChange: [
+      async ({ doc, req }) => {
+        if (doc.protected !== false) {
+          await protectMediaFile({ media: doc.file, payload: req.payload, req })
+        }
+      },
+    ],
   },
   fields: [
     { name: 'product', type: 'relationship', relationTo: 'products', required: true, index: true },

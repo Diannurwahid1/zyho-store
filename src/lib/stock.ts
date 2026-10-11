@@ -2,7 +2,7 @@
  * Stock management utilities.
  *
  * Alur stok:
- *  1. User mulai checkout → reserveStock() dipanggil → status = 'pending', expiresAt = now + 10 menit
+ *  1. User mulai checkout → reserveStock() dipanggil → status = 'pending', expiresAt = now + 60 menit
  *  2. Cron setiap menit → releaseExpiredReservations() → release semua pending yang sudah expired
  *  3. Pembayaran berhasil → confirmStockReservation() → status = 'confirmed', inventory dikurangi
  *  4. Pembayaran dibatalkan / expired → releaseReservation() → status = 'released'
@@ -12,10 +12,10 @@
  * Setiap perubahan stok dicatat ke StockLedger (kartu stok permanen).
  */
 
-import type { BasePayload } from 'payload'
+import type { BasePayload, PayloadRequest } from 'payload'
 import { getNormalizedBundleItems, isBundleProduct } from '@/lib/bundles'
 
-export const RESERVATION_TTL_MINUTES = 10
+export const RESERVATION_TTL_MINUTES = 60
 
 const isPerUnitDigitalStockProduct = (product: unknown) =>
   Boolean(
@@ -45,6 +45,7 @@ async function writeLedger(
     notes?: string | null
     costPerUnit?: number | null
   },
+  req?: PayloadRequest,
 ): Promise<void> {
   try {
     const costPerUnit = opts.costPerUnit && opts.costPerUnit > 0 ? opts.costPerUnit : undefined
@@ -67,6 +68,7 @@ async function writeLedger(
         totalCost,
       } as any,
       overrideAccess: true,
+      req,
     })
   } catch (err) {
     // Ledger write failure should never block the main flow
@@ -79,6 +81,7 @@ export async function getAvailableStock(
   payload: BasePayload,
   productId: string | number,
   variantId?: string | null,
+  req?: PayloadRequest,
 ): Promise<number> {
   // Ambil inventory dari produk
   const product = await payload.findByID({
@@ -86,6 +89,7 @@ export async function getAvailableStock(
     id: productId,
     depth: 1,
     overrideAccess: true,
+    req,
   })
 
   let inventory = 0
@@ -98,18 +102,16 @@ export async function getAvailableStock(
     let maxBundles = Number.POSITIVE_INFINITY
 
     for (const item of bundleItems) {
-      const childAvailable = await getAvailableStock(payload, item.productId, null)
+      const childAvailable = await getAvailableStock(payload, item.productId, null, req)
       maxBundles = Math.min(maxBundles, Math.floor(childAvailable / item.quantity))
     }
 
     inventory = Number.isFinite(maxBundles) ? Math.max(0, maxBundles) : 0
   } else if (isPerUnitDigitalStockProduct(product)) {
-    const availableUnits = await payload.find({
+    const availableUnits = await payload.count({
       collection: 'digital-stock-units',
-      depth: 0,
-      limit: 1000,
       overrideAccess: true,
-      pagination: false,
+      req,
       where: {
         and: [
           { product: { equals: productId } },
@@ -125,7 +127,7 @@ export async function getAvailableStock(
       } as any,
     })
 
-    inventory = availableUnits.docs.length
+    inventory = availableUnits.totalDocs
   } else if (variantId) {
     const variants = (product as any)?.variants?.docs || []
     const variant = variants.find((v: any) => typeof v === 'object' && v.id === variantId)
@@ -136,23 +138,89 @@ export async function getAvailableStock(
 
   // Hitung total pending reservations yang belum expired
   const now = new Date().toISOString()
-  const pendingRes = await payload.find({
-    collection: 'stock-reservations',
-    where: {
-      and: [
-        { product: { equals: productId } },
-        { variant: variantId ? { equals: variantId } : { exists: false } },
-        { status: { equals: 'pending' } },
-        { expiresAt: { greater_than: now } },
-      ],
-    },
-    limit: 1000,
-    overrideAccess: true,
-  })
-
-  const reserved = pendingRes.docs.reduce((sum: number, r: any) => sum + (r.quantity || 0), 0)
+  let reserved = 0
+  let page = 1
+  let hasNextPage = true
+  while (hasNextPage) {
+    const pendingRes = await payload.find({
+      collection: 'stock-reservations',
+      where: {
+        and: [
+          { product: { equals: productId } },
+          { variant: variantId ? { equals: variantId } : { exists: false } },
+          { status: { equals: 'pending' } },
+          { expiresAt: { greater_than: now } },
+        ],
+      },
+      limit: 500,
+      page,
+      overrideAccess: true,
+      req,
+    })
+    reserved += pendingRes.docs.reduce(
+      (sum: number, reservation: any) => sum + Number(reservation.quantity || 0),
+      0,
+    )
+    hasNextPage = pendingRes.hasNextPage
+    page += 1
+  }
 
   return Math.max(0, inventory - reserved)
+}
+
+export async function hydrateProductAvailableInventory<T extends Record<string, any>>(
+  payload: BasePayload,
+  product: T,
+  req?: PayloadRequest,
+): Promise<T> {
+  if (!product.id) return product
+  if (isBundleProduct(product)) {
+    return {
+      ...product,
+      inventory: await getAvailableStock(payload, product.id, null, req),
+    }
+  }
+  if (!isPerUnitDigitalStockProduct(product)) return product
+
+  const variantsContainer = product.variants
+  const variants = Array.isArray(variantsContainer)
+    ? variantsContainer
+    : Array.isArray(variantsContainer?.docs)
+      ? variantsContainer.docs
+      : []
+  const hydratedVariants = await Promise.all(
+    variants.map(async (variant: unknown) => {
+      if (!variant || typeof variant !== 'object' || !('id' in variant)) return variant
+      const variantID = (variant as { id?: number | string }).id
+      if (!variantID) return variant
+      return {
+        ...variant,
+        inventory: await getAvailableStock(payload, product.id, String(variantID), req),
+      }
+    }),
+  )
+  const baseInventory = await getAvailableStock(payload, product.id, null, req)
+  const totalInventory =
+    hydratedVariants.length > 0
+      ? hydratedVariants.reduce(
+          (sum, variant) =>
+            sum +
+            (variant && typeof variant === 'object' && 'inventory' in variant
+              ? Number(variant.inventory || 0)
+              : 0),
+          baseInventory,
+        )
+      : baseInventory
+
+  return {
+    ...product,
+    inventory: totalInventory,
+    ...(Array.isArray(variantsContainer)
+      ? { variants: hydratedVariants }
+      : variantsContainer && typeof variantsContainer === 'object'
+        ? { variants: { ...variantsContainer, docs: hydratedVariants } }
+        : {}),
+  }
 }
 
 /** Buat reservasi stok baru */
@@ -169,62 +237,94 @@ export async function reserveStock(
 ): Promise<{ success: boolean; error?: string; reservationDocId?: string | number }> {
   const { reservationId, productId, variantId, quantity, customerId, cartId } = opts
 
-  // Cek apakah reservasi dengan ID ini sudah ada
-  const existing = await payload.find({
-    collection: 'stock-reservations',
-    where: {
-      and: [
-        { reservationId: { equals: reservationId } },
-        { status: { equals: 'pending' } },
-      ],
-    },
-    limit: 1,
-    overrideAccess: true,
-  })
-
-  if (existing.docs.length > 0) {
-    // Sudah ada reservasi aktif, return existing
-    return { success: true, reservationDocId: existing.docs[0]!.id }
+  if (
+    !reservationId ||
+    reservationId.length > 200 ||
+    !Number.isInteger(quantity) ||
+    quantity < 1 ||
+    quantity > 100
+  ) {
+    return { success: false, error: 'Data reservasi stok tidak valid.' }
   }
 
-  // Cek stok tersedia
-  const available = await getAvailableStock(payload, productId, variantId)
-  if (available < quantity) {
-    return { success: false, error: `Stok tidak cukup. Tersedia: ${available}` }
+  const transactionID = await payload.db.beginTransaction({
+    accessMode: 'read write',
+    isolationLevel: 'serializable',
+  })
+  const req = transactionID ? ({ payload, transactionID } as PayloadRequest) : undefined
+
+  try {
+    const existing = await payload.find({
+      collection: 'stock-reservations',
+      where: { reservationId: { equals: reservationId } },
+      limit: 1,
+      overrideAccess: true,
+      req,
+    })
+    if (existing.docs.length > 0) {
+      const existingReservation = existing.docs[0] as any
+      if (
+        existingReservation.status === 'pending' &&
+        String(existingReservation.product?.id || existingReservation.product) === String(productId) &&
+        String(existingReservation.variant || '') === String(variantId || '') &&
+        Number(existingReservation.quantity) === quantity
+      ) {
+        if (transactionID) await payload.db.commitTransaction(transactionID)
+        return { success: true, reservationDocId: existingReservation.id }
+      }
+      throw new Error('Reservation ID sudah digunakan untuk data yang berbeda.')
+    }
+
+    const available = await getAvailableStock(payload, productId, variantId, req)
+    if (available < quantity) {
+      if (transactionID) await payload.db.rollbackTransaction(transactionID)
+      return { success: false, error: `Stok tidak cukup. Tersedia: ${available}` }
+    }
+
+    const expiresAt = new Date(Date.now() + RESERVATION_TTL_MINUTES * 60 * 1000).toISOString()
+    const reservation = await payload.create({
+      collection: 'stock-reservations',
+      data: {
+        reservationId,
+        product: productId as any,
+        variant: variantId || undefined,
+        quantity,
+        status: 'pending',
+        expiresAt,
+        customer: customerId as any,
+        cartId: cartId || undefined,
+      } as any,
+      overrideAccess: true,
+      req,
+    })
+
+    const currentStock = await getAvailableStock(payload, productId, variantId, req)
+    await writeLedger(
+      payload,
+      {
+        productId,
+        variantId,
+        type: 'reserved',
+        qty: -quantity,
+        stockBefore: currentStock + quantity,
+        stockAfter: currentStock,
+        referenceId: reservationId,
+        customerId,
+        notes: `Stok dipesan sementara (cart: ${cartId || '-'})`,
+      },
+      req,
+    )
+
+    if (transactionID) await payload.db.commitTransaction(transactionID)
+    return { success: true, reservationDocId: reservation.id }
+  } catch (error) {
+    if (transactionID) await payload.db.rollbackTransaction(transactionID).catch(() => undefined)
+    const message = error instanceof Error ? error.message : String(error)
+    if (/unique|duplicate|serialization|40001/i.test(message)) {
+      return { success: false, error: 'Stok sedang diproses. Silakan coba lagi.' }
+    }
+    throw error
   }
-
-  const expiresAt = new Date(Date.now() + RESERVATION_TTL_MINUTES * 60 * 1000).toISOString()
-
-  const reservation = await payload.create({
-    collection: 'stock-reservations',
-    data: {
-      reservationId,
-      product: productId as any,
-      variant: variantId || undefined,
-      quantity,
-      status: 'pending',
-      expiresAt,
-      customer: customerId as any,
-      cartId: cartId || undefined,
-    } as any,
-    overrideAccess: true,
-  })
-
-  // Catat ke ledger
-  const currentStock = await getAvailableStock(payload, productId, variantId)
-  await writeLedger(payload, {
-    productId,
-    variantId,
-    type: 'reserved',
-    qty: -quantity,
-    stockBefore: currentStock + quantity,
-    stockAfter: currentStock,
-    referenceId: reservationId,
-    customerId,
-    notes: `Stok dipesan sementara (cart: ${cartId || '-'})`,
-  })
-
-  return { success: true, reservationDocId: reservation.id }
 }
 
 /** Konfirmasi reservasi setelah pembayaran berhasil — kurangi inventory */
@@ -232,6 +332,7 @@ export async function confirmStockReservation(
   payload: BasePayload,
   reservationId: string,
   orderId: string | number,
+  req?: PayloadRequest,
 ): Promise<{ success: boolean; error?: string }> {
   const res = await payload.find({
     collection: 'stock-reservations',
@@ -243,6 +344,7 @@ export async function confirmStockReservation(
     },
     limit: 1,
     overrideAccess: true,
+    req,
   })
 
   if (res.docs.length === 0) {
@@ -257,6 +359,7 @@ export async function confirmStockReservation(
       },
       limit: 1,
       overrideAccess: true,
+      req,
     })
     if (confirmed.docs.length > 0) return { success: true }
     return { success: false, error: 'Reservasi tidak ditemukan atau sudah expired.' }
@@ -267,72 +370,74 @@ export async function confirmStockReservation(
   const variantId = reservation.variant || null
   const quantity = reservation.quantity
 
-  // Update status reservasi
-  await payload.update({
-    collection: 'stock-reservations',
-    id: reservation.id,
+  const claimedReservation = await payload.db.updateOne({
+    collection: 'stock-reservations' as any,
     data: {
       status: 'confirmed',
       order: orderId as any,
     } as any,
-    overrideAccess: true,
+    req,
+    where: {
+      and: [{ id: { equals: reservation.id } }, { status: { equals: 'pending' } }],
+    } as any,
   })
+  if (!claimedReservation) {
+    return { success: false, error: 'Reservasi sedang diproses atau sudah tidak aktif.' }
+  }
 
-  // NOTE: Inventory decrement sudah di-handle oleh @payloadcms/plugin-ecommerce
-  // di confirmOrder endpoint (via $inc). Kita TIDAK mengurangi inventory di sini
-  // untuk menghindari double deduction. Cukup tulis ledger saja.
   const customerId = reservation.customer
     ? typeof reservation.customer === 'object'
       ? reservation.customer.id
       : reservation.customer
     : null
 
-  if (variantId) {
-    try {
-      const variantDoc = await payload.findByID({
-        collection: 'variants' as any,
-        id: variantId,
-        overrideAccess: true,
-      })
-      const currentInventory = (variantDoc as any)?.inventory ?? 0
-      await writeLedger(payload, {
+  let product = reservation.product
+  if (!product || typeof product !== 'object') {
+    product = await payload.findByID({
+      collection: 'products',
+      id: productId,
+      depth: 0,
+      overrideAccess: true,
+      req,
+    })
+  }
+
+  if (!isPerUnitDigitalStockProduct(product)) {
+    const inventoryCollection = variantId ? 'variants' : 'products'
+    const inventoryID = variantId || productId
+    const updatedInventory = await payload.db.updateOne({
+      collection: inventoryCollection as any,
+      data: { inventory: { $inc: quantity * -1 } },
+      req,
+      where: {
+        and: [
+          { id: { equals: inventoryID } },
+          { inventory: { greater_than_equal: quantity } },
+        ],
+      } as any,
+    })
+
+    if (!updatedInventory) {
+      return { success: false, error: 'Stok berubah dan tidak lagi mencukupi.' }
+    }
+
+    const stockAfter = Number((updatedInventory as any).inventory || 0)
+    await writeLedger(
+      payload,
+      {
         productId,
         variantId,
         type: 'out',
         qty: -quantity,
-        stockBefore: currentInventory,
-        stockAfter: Math.max(0, currentInventory - quantity),
+        stockBefore: stockAfter + quantity,
+        stockAfter,
         referenceId: reservationId,
         orderId,
         customerId,
-        notes: `Stok keluar (terjual) — order #${orderId}`,
-      })
-    } catch (err) {
-      payload.logger.warn({ err, variantId }, '[Stock] Gagal tulis ledger variant')
-    }
-  } else {
-    try {
-      const product = await payload.findByID({
-        collection: 'products',
-        id: productId,
-        overrideAccess: true,
-      })
-      const currentInventory = (product as any)?.inventory ?? 0
-      await writeLedger(payload, {
-        productId,
-        variantId: null,
-        type: 'out',
-        qty: -quantity,
-        stockBefore: currentInventory,
-        stockAfter: Math.max(0, currentInventory - quantity),
-        referenceId: reservationId,
-        orderId,
-        customerId,
-        notes: `Stok keluar (terjual) — order #${orderId}`,
-      })
-    } catch (err) {
-      payload.logger.warn({ err, productId }, '[Stock] Gagal tulis ledger product')
-    }
+        notes: `Stok keluar (terjual) - order #${orderId}`,
+      },
+      req,
+    )
   }
 
   return { success: true }
@@ -363,15 +468,17 @@ export async function releaseReservation(
     const docVariantId = (doc as any).variant || null
     const docQty = (doc as any).quantity || 0
 
-    await payload.update({
-      collection: 'stock-reservations',
-      id: doc.id,
+    const releasedReservation = await payload.db.updateOne({
+      collection: 'stock-reservations' as any,
       data: {
         status: 'released',
         notes: reason || 'Released',
       } as any,
-      overrideAccess: true,
+      where: {
+        and: [{ id: { equals: doc.id } }, { status: { equals: 'pending' } }],
+      } as any,
     })
+    if (!releasedReservation) continue
 
     // Catat ke ledger — stok kembali ke pool
     const stockNow = await getAvailableStock(payload, docProductId, docVariantId)
@@ -417,15 +524,17 @@ export async function releaseExpiredReservations(
     const docVariantId = (doc as any).variant || null
     const docQty = (doc as any).quantity || 0
 
-    await payload.update({
-      collection: 'stock-reservations',
-      id: doc.id,
+    const releasedReservation = await payload.db.updateOne({
+      collection: 'stock-reservations' as any,
       data: {
         status: 'released',
-        notes: 'Auto-released: payment timeout (10 menit)',
+        notes: 'Auto-released: payment timeout (60 menit)',
       } as any,
-      overrideAccess: true,
+      where: {
+        and: [{ id: { equals: doc.id } }, { status: { equals: 'pending' } }],
+      } as any,
     })
+    if (!releasedReservation) continue
 
     // Catat ke ledger
     const stockNow = await getAvailableStock(payload, docProductId, docVariantId)
@@ -437,7 +546,7 @@ export async function releaseExpiredReservations(
       stockBefore: stockNow - docQty,
       stockAfter: stockNow,
       referenceId: (doc as any).reservationId,
-      notes: 'Auto-released: payment timeout (10 menit)',
+      notes: 'Auto-released: payment timeout (60 menit)',
     })
 
     released++
@@ -466,6 +575,7 @@ export async function addStock(
     notes?: string | null
     costPerUnit?: number | null
   },
+  req?: PayloadRequest,
 ): Promise<{ success: boolean; newInventory: number; error?: string }> {
   const { productId, variantId, quantity, type = 'in', referenceId, performedById, notes, costPerUnit } = opts
 
@@ -473,61 +583,69 @@ export async function addStock(
 
   if (variantId) {
     try {
-      const variantDoc = await payload.findByID({
+      const conditions: Record<string, any>[] = [{ id: { equals: variantId } }]
+      if (quantity < 0) conditions.push({ inventory: { greater_than_equal: Math.abs(quantity) } })
+      const variantDoc = await payload.db.updateOne({
         collection: 'variants' as any,
-        id: variantId,
-        overrideAccess: true,
+        data: { inventory: { $inc: quantity } },
+        req,
+        where: { and: conditions },
       })
-      const currentInventory = (variantDoc as any)?.inventory ?? 0
-      const newInventory = Math.max(0, currentInventory + quantity)
-      await payload.update({
-        collection: 'variants' as any,
-        id: variantId,
-        data: { inventory: newInventory } as any,
-        overrideAccess: true,
-      })
-      await writeLedger(payload, {
-        productId,
-        variantId,
-        type,
-        qty: quantity,
-        stockBefore: currentInventory,
-        stockAfter: newInventory,
-        referenceId,
-        performedById,
-        notes: notes || (type === 'in' ? 'Restock' : type === 'out' ? 'Stok keluar' : 'Penyesuaian manual'),
-        costPerUnit,
-      })
+      if (!variantDoc) {
+        return { success: false, newInventory: 0, error: 'Stok variant tidak mencukupi.' }
+      }
+      const newInventory = Number((variantDoc as any).inventory || 0)
+      await writeLedger(
+        payload,
+        {
+          productId,
+          variantId,
+          type,
+          qty: quantity,
+          stockBefore: newInventory - quantity,
+          stockAfter: newInventory,
+          referenceId,
+          performedById,
+          notes:
+            notes ||
+            (type === 'in' ? 'Restock' : type === 'out' ? 'Stok keluar' : 'Penyesuaian manual'),
+          costPerUnit,
+        },
+        req,
+      )
       return { success: true, newInventory }
     } catch (err) {
       return { success: false, newInventory: 0, error: String(err) }
     }
   } else {
-    const product = await payload.findByID({
+    const conditions: Record<string, any>[] = [{ id: { equals: productId } }]
+    if (quantity < 0) conditions.push({ inventory: { greater_than_equal: Math.abs(quantity) } })
+    const product = await payload.db.updateOne({
       collection: 'products',
-      id: productId,
-      overrideAccess: true,
+      data: { inventory: { $inc: quantity } },
+      req,
+      where: { and: conditions },
     })
-    const currentInventory = (product as any)?.inventory ?? 0
-    const newInventory = Math.max(0, currentInventory + quantity)
-    await payload.update({
-      collection: 'products',
-      id: productId,
-      data: { inventory: newInventory } as any,
-      overrideAccess: true,
-    })
-    await writeLedger(payload, {
-      productId,
-      variantId: null,
-      type,
-      qty: quantity,
-      stockBefore: currentInventory,
-      stockAfter: newInventory,
-      referenceId,
-      performedById,
-      notes: notes || (type === 'in' ? 'Restock' : type === 'out' ? 'Stok keluar' : 'Penyesuaian manual'),
-      costPerUnit,
-    })
+    if (!product) return { success: false, newInventory: 0, error: 'Stok produk tidak mencukupi.' }
+    const newInventory = Number((product as any).inventory || 0)
+    await writeLedger(
+      payload,
+      {
+        productId,
+        variantId: null,
+        type,
+        qty: quantity,
+        stockBefore: newInventory - quantity,
+        stockAfter: newInventory,
+        referenceId,
+        performedById,
+        notes:
+          notes ||
+          (type === 'in' ? 'Restock' : type === 'out' ? 'Stok keluar' : 'Penyesuaian manual'),
+        costPerUnit,
+      },
+      req,
+    )
     return { success: true, newInventory }
   }
 }

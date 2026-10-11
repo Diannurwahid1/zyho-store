@@ -57,6 +57,10 @@ type DigitalUnitDraft = {
   referenceCode: string
 }
 
+const MAX_EXCEL_FILE_BYTES = 5 * 1024 * 1024
+const MAX_EXCEL_ROWS = 1000
+const MAX_EXCEL_CELL_LENGTH = 10_000
+
 const createEmptyUnit = (): DigitalUnitDraft => ({
   accountEmail: '',
   accountPassword: '',
@@ -77,7 +81,7 @@ const normalizeExcelHeader = (value: string) =>
 
 const normalizeExcelCell = (value: unknown) => {
   if (value === null || value === undefined) return ''
-  return String(value).trim()
+  return String(value).trim().slice(0, MAX_EXCEL_CELL_LENGTH)
 }
 
 const getExcelValue = (row: Record<string, unknown>, aliases: string[]) => {
@@ -364,29 +368,51 @@ export const StockAdjustmentField: React.FC = () => {
       return
     }
 
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
+      toast.error('Format file harus .xlsx.')
+      return
+    }
+
+    if (file.size > MAX_EXCEL_FILE_BYTES) {
+      toast.error('Ukuran file Excel maksimal 5 MB.')
+      return
+    }
+
     setIsImportingExcel(true)
 
     try {
-      const XLSX = await import('xlsx')
+      const { default: ExcelJS } = await import('exceljs')
       const buffer = await file.arrayBuffer()
-      const workbook = XLSX.read(buffer, { type: 'array' })
-      const firstSheetName = workbook.SheetNames[0]
+      const workbook = new ExcelJS.Workbook()
+      await workbook.xlsx.load(buffer)
+      const worksheet = workbook.worksheets[0]
 
-      if (!firstSheetName) {
+      if (!worksheet) {
         toast.error('Sheet Excel tidak ditemukan.')
         return
       }
 
-      const worksheet = workbook.Sheets[firstSheetName]
-      if (!worksheet) {
-        toast.error('Sheet Excel tidak bisa dibaca.')
+      if (worksheet.actualRowCount > MAX_EXCEL_ROWS + 1) {
+        toast.error(`File Excel maksimal ${MAX_EXCEL_ROWS} baris data.`)
         return
       }
 
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
-        defval: '',
-        raw: false,
+      const headers: string[] = []
+      worksheet.getRow(1).eachCell({ includeEmpty: true }, (cell, columnNumber) => {
+        headers[columnNumber - 1] = normalizeExcelCell(cell.text)
       })
+
+      const rows: Record<string, unknown>[] = []
+      worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        if (rowNumber === 1 || rows.length >= MAX_EXCEL_ROWS) return
+
+        const record: Record<string, unknown> = {}
+        headers.forEach((header, columnIndex) => {
+          if (header) record[header] = normalizeExcelCell(row.getCell(columnIndex + 1).text)
+        })
+        rows.push(record)
+      })
+
       const importedUnits = rows.map(mapExcelRowToUnit).filter(hasImportedUnitData)
 
       if (importedUnits.length === 0) {
@@ -402,7 +428,7 @@ export const StockAdjustmentField: React.FC = () => {
       toast.success(`${importedUnits.length} credentials berhasil diimpor dari Excel.`)
     } catch (err) {
       console.error('[StockAdjustment] Failed to import Excel', err)
-      toast.error('Gagal membaca Excel. Pastikan format file .xlsx, .xls, atau .csv.')
+      toast.error('Gagal membaca Excel. Pastikan file valid dan berformat .xlsx.')
     } finally {
       setIsImportingExcel(false)
     }
@@ -410,7 +436,18 @@ export const StockAdjustmentField: React.FC = () => {
 
   const handleDownloadExcelTemplate = async () => {
     try {
-      const XLSX = await import('xlsx')
+      const { default: ExcelJS } = await import('exceljs')
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet('credentials')
+      worksheet.columns = [
+        { header: 'label', key: 'label', width: 18 },
+        { header: 'email', key: 'email', width: 32 },
+        { header: 'username', key: 'username', width: 24 },
+        { header: 'password', key: 'password', width: 24 },
+        { header: 'login_url', key: 'login_url', width: 32 },
+        { header: 'reference_code', key: 'reference_code', width: 22 },
+        { header: 'notes', key: 'notes', width: 36 },
+      ]
       const rows = [
         {
           label: 'Slot 1',
@@ -431,21 +468,21 @@ export const StockAdjustmentField: React.FC = () => {
           notes: '',
         },
       ]
-      const worksheet = XLSX.utils.json_to_sheet(rows, {
-        header: ['label', 'email', 'username', 'password', 'login_url', 'reference_code', 'notes'],
+      worksheet.addRows(rows)
+      worksheet.getRow(1).font = { bold: true }
+
+      const output = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([output], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       })
-      worksheet['!cols'] = [
-        { wch: 18 },
-        { wch: 32 },
-        { wch: 24 },
-        { wch: 24 },
-        { wch: 32 },
-        { wch: 22 },
-        { wch: 36 },
-      ]
-      const workbook = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'credentials')
-      XLSX.writeFile(workbook, 'template-import-stok-credentials.xlsx')
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'template-import-stok-credentials.xlsx'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
     } catch (err) {
       console.error('[StockAdjustment] Failed to download Excel template', err)
       toast.error('Gagal membuat template Excel.')
@@ -1240,7 +1277,7 @@ export const StockAdjustmentField: React.FC = () => {
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                           <input
                             ref={importFileRef}
-                            accept=".xlsx,.xls,.csv"
+                            accept=".xlsx"
                             onChange={(event) => void handleExcelImport(event)}
                             style={{ display: 'none' }}
                             type="file"
@@ -1351,7 +1388,7 @@ export const StockAdjustmentField: React.FC = () => {
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                           <input
                             ref={importFileRef}
-                            accept=".xlsx,.xls,.csv"
+                            accept=".xlsx"
                             onChange={(event) => void handleExcelImport(event)}
                             style={{ display: 'none' }}
                             type="file"

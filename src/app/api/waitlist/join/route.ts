@@ -1,15 +1,46 @@
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
+import { enforceRateLimit, getClientIP, readJSONBodyLimited } from '@/utilities/security'
+
+const MAX_BODY_BYTES = 4 * 1024
 
 export async function POST(req: Request) {
+  const rateLimited = enforceRateLimit({
+    key: `waitlist-join:${getClientIP(req)}`,
+    limit: 5,
+    request: req,
+    responseMessage: 'Terlalu banyak permintaan waitlist.',
+    windowMs: 60 * 60_000,
+  })
+  if (rateLimited) return rateLimited
+
   try {
     const payload = await getPayload({ config: configPromise })
-    const body = await req.json()
-    const { productId, phone, quantity, name } = body
+    const parsed = await readJSONBodyLimited<Record<string, unknown>>(req, MAX_BODY_BYTES)
+    if (parsed.response) return parsed.response
+    const body = parsed.data
+    const productId = String(body?.productId || '')
+    const phone = String(body?.phone || '').replace(/\D/g, '')
+    const quantity = Number(body?.quantity ?? 1)
+    const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 100) : 'Guest'
 
-    if (!productId || !phone) {
-      return Response.json({ error: 'Product ID dan Nomor WhatsApp wajib diisi' }, { status: 400 })
+    if (
+      !/^\d{1,20}$/.test(productId) ||
+      phone.length < 10 ||
+      phone.length > 15 ||
+      !Number.isInteger(quantity) ||
+      quantity < 1 ||
+      quantity > 100
+    ) {
+      return Response.json({ error: 'Data waitlist tidak valid.' }, { status: 400 })
     }
+
+    await payload.findByID({
+      collection: 'products',
+      depth: 0,
+      id: productId,
+      overrideAccess: true,
+    })
 
     // 1. Cari atau buat Waitlist untuk produk ini
     let waitlistId: number | string
@@ -36,16 +67,23 @@ export async function POST(req: Request) {
         })
       }
     } else {
-      const newWaitlist = await payload.create({
-        collection: 'waitlists',
-        data: {
-          product: productId,
-          status: 'active',
-          totalEntries: 0,
-        },
-        overrideAccess: true,
-      })
-      waitlistId = newWaitlist.id
+      try {
+        const newWaitlist = await payload.create({
+          collection: 'waitlists',
+          data: { product: Number(productId), status: 'active', totalEntries: 0 },
+          overrideAccess: true,
+        })
+        waitlistId = newWaitlist.id
+      } catch {
+        const raced = await payload.find({
+          collection: 'waitlists',
+          limit: 1,
+          overrideAccess: true,
+          where: { product: { equals: productId } },
+        })
+        if (!raced.docs[0]) throw new Error('Gagal membuat waitlist.')
+        waitlistId = raced.docs[0].id
+      }
     }
 
     // 2. Cek apakah user sudah ada di waitlist ini dengan nomor yang sama
@@ -68,7 +106,7 @@ export async function POST(req: Request) {
         collection: 'waitlist-entries',
         id: existingEntry.docs[0].id,
         data: {
-          quantity: (existingEntry.docs[0].quantity || 0) + (quantity || 1),
+          quantity,
         },
         overrideAccess: true,
       })
@@ -92,21 +130,43 @@ export async function POST(req: Request) {
     }
 
     // 4. Buat entry baru
-    await payload.create({
-      collection: 'waitlist-entries',
-      data: {
-        waitlist: waitlistId,
-        phone,
-        name: name || 'Guest',
-        quantity: quantity || 1,
-        status: 'waiting',
-        customer: customerId,
-      },
-      overrideAccess: true,
-    })
+    try {
+      await payload.create({
+        collection: 'waitlist-entries',
+        data: {
+          waitlist: waitlistId,
+          phone,
+          name: name || 'Guest',
+          quantity,
+          status: 'waiting',
+          customer: customerId,
+        },
+        overrideAccess: true,
+      })
+    } catch (error) {
+      const racedEntry = await payload.find({
+        collection: 'waitlist-entries',
+        limit: 1,
+        overrideAccess: true,
+        where: {
+          and: [
+            { waitlist: { equals: waitlistId } },
+            { phone: { equals: phone } },
+            { status: { equals: 'waiting' } },
+          ],
+        },
+      })
+      if (!racedEntry.docs[0]) throw error
+      await payload.update({
+        collection: 'waitlist-entries',
+        data: { quantity },
+        id: racedEntry.docs[0].id,
+        overrideAccess: true,
+      })
+    }
 
     return Response.json({ success: true })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Waitlist join error:', error)
     return Response.json({ error: 'Terjadi kesalahan internal' }, { status: 500 })
   }

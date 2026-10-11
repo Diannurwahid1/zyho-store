@@ -1,32 +1,18 @@
 import { adminOrManager, staffOnly } from '@/access/roles'
-import CryptoJS from 'crypto-js'
-import { createHash } from 'crypto'
 import type { CollectionConfig } from 'payload'
-
-const getEncryptionKey = () => {
-  const encryptionKey = process.env.ENCRYPTION_KEY
-  if (!encryptionKey) throw new Error('ENCRYPTION_KEY is required.')
-  return encryptionKey
-}
-
-const encryptValue = (value: unknown) => {
-  if (!value || typeof value !== 'string') return value
-  return CryptoJS.AES.encrypt(value, getEncryptionKey()).toString()
-}
-
-const decryptValue = (value: unknown) => {
-  if (!value || typeof value !== 'string') return value
-  const decrypted = CryptoJS.AES.decrypt(value, getEncryptionKey()).toString(CryptoJS.enc.Utf8)
-
-  return decrypted || value
-}
+import { protectMediaFile } from '@/utilities/privateMedia'
+import {
+  decryptSensitiveValue,
+  encryptSensitiveValue,
+  keyedLookup,
+} from '@/utilities/sensitiveData'
 
 const normalizeRedeemCode = (value: unknown) => {
   if (typeof value !== 'string') return ''
   return value.trim().toUpperCase()
 }
 
-const hashRedeemCode = (value: string) => createHash('sha256').update(value).digest('hex')
+const hashRedeemCode = (value: string) => keyedLookup('redeem-code', value)
 
 const generateUnitCode = () =>
   `DSTK-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`
@@ -43,11 +29,18 @@ export const DigitalStockUnits: CollectionConfig = {
     group: 'Digital Commerce',
     useAsTitle: 'unitCode',
     defaultColumns: ['unitCode', 'product', 'status', 'accountEmail', 'order'],
-    listSearchableFields: ['unitCode', 'accountEmail', 'accountUsername', 'referenceCode', 'label'],
+    listSearchableFields: ['unitCode', 'label'],
     description:
       'Stok digital per unit, misalnya akun email/password, catatan akses, atau file per stok.',
   },
   hooks: {
+    afterChange: [
+      async ({ doc, req }) => {
+        if (doc.deliveryType === 'file' && doc.file) {
+          await protectMediaFile({ media: doc.file, payload: req.payload, req })
+        }
+      },
+    ],
     beforeChange: [
       ({ data }) => {
         if (!data || typeof data !== 'object') return data
@@ -117,16 +110,30 @@ export const DigitalStockUnits: CollectionConfig = {
     {
       type: 'row',
       fields: [
-        { name: 'accountEmail', type: 'text' },
-        { name: 'accountUsername', type: 'text' },
+        {
+          name: 'accountEmail',
+          type: 'text',
+          hooks: {
+            beforeChange: [({ value }) => encryptSensitiveValue(value)],
+            afterRead: [({ value }) => decryptSensitiveValue(value)],
+          },
+        },
+        {
+          name: 'accountUsername',
+          type: 'text',
+          hooks: {
+            beforeChange: [({ value }) => encryptSensitiveValue(value)],
+            afterRead: [({ value }) => decryptSensitiveValue(value)],
+          },
+        },
       ],
     },
     {
       name: 'accountPassword',
       type: 'textarea',
       hooks: {
-        beforeChange: [({ value }) => encryptValue(value)],
-        afterRead: [({ value }) => decryptValue(value)],
+        beforeChange: [({ value }) => encryptSensitiveValue(value)],
+        afterRead: [({ value }) => decryptSensitiveValue(value)],
       },
       admin: {
         condition: (_, siblingData) => siblingData?.deliveryType === 'credentials',
@@ -135,6 +142,10 @@ export const DigitalStockUnits: CollectionConfig = {
     {
       name: 'loginUrl',
       type: 'text',
+      hooks: {
+        beforeChange: [({ value }) => encryptSensitiveValue(value)],
+        afterRead: [({ value }) => decryptSensitiveValue(value)],
+      },
       admin: {
         condition: (_, siblingData) => siblingData?.deliveryType === 'credentials',
       },
@@ -142,6 +153,10 @@ export const DigitalStockUnits: CollectionConfig = {
     {
       name: 'referenceCode',
       type: 'text',
+      hooks: {
+        beforeChange: [({ value }) => encryptSensitiveValue(value)],
+        afterRead: [({ value }) => decryptSensitiveValue(value)],
+      },
       admin: {
         description: 'Kode internal atau catatan singkat lain yang mau ikut dikirim.',
       },
@@ -150,8 +165,8 @@ export const DigitalStockUnits: CollectionConfig = {
       name: 'content',
       type: 'textarea',
       hooks: {
-        beforeChange: [({ value }) => encryptValue(value)],
-        afterRead: [({ value }) => decryptValue(value)],
+        beforeChange: [({ value }) => encryptSensitiveValue(value)],
+        afterRead: [({ value }) => decryptSensitiveValue(value)],
       },
       admin: {
         description: 'Catatan bebas: OTP backup, instruksi aktivasi, teks lisensi, dll.',
@@ -219,8 +234,10 @@ export const DigitalStockUnits: CollectionConfig = {
               'Kode redeem unik untuk customer. Sekali berhasil dipakai, unit ini langsung masuk order gift redeem.',
           },
           hooks: {
-            beforeChange: [({ value }) => encryptValue(normalizeRedeemCode(value) || null)],
-            afterRead: [({ value }) => decryptValue(value)],
+            beforeChange: [
+              ({ value }) => encryptSensitiveValue(normalizeRedeemCode(value) || null),
+            ],
+            afterRead: [({ value }) => decryptSensitiveValue(value)],
           },
         },
         {

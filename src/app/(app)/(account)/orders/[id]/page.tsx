@@ -17,12 +17,13 @@ import { headers as getHeaders } from 'next/headers.js'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { getPayload } from 'payload'
+import { verifyOrderAccessToken } from '@/utilities/orderAccessToken'
 
 export const dynamic = 'force-dynamic'
 
 type PageProps = {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ accessToken?: string; email?: string }>
+  searchParams: Promise<{ accessToken?: string }>
 }
 
 export default async function Order({ params, searchParams }: PageProps) {
@@ -33,9 +34,9 @@ export default async function Order({ params, searchParams }: PageProps) {
   const { id } = await params
   const resolvedSearchParams = await searchParams
   const accessToken = resolvedSearchParams?.accessToken
-  const emailFromQuery = resolvedSearchParams?.email
+  const accessClaims = accessToken ? verifyOrderAccessToken(accessToken) : null
 
-  if (!user && !accessToken) {
+  if (!user && !accessClaims) {
     redirect(`/login?redirect=${encodeURIComponent(`/orders/${id}`)}`)
   }
 
@@ -56,7 +57,6 @@ export default async function Order({ params, searchParams }: PageProps) {
         },
       },
         select: {
-          accessToken: true,
           amount: true,
           currency: true,
           items: true,
@@ -79,7 +79,6 @@ export default async function Order({ params, searchParams }: PageProps) {
 
       const normalizedOrderEmail = String(orderResult.customerEmail || '').toLowerCase()
       const normalizedUserEmail = String(user?.email || '').toLowerCase()
-      const normalizedQueryEmail = String(emailFromQuery || '').toLowerCase()
 
       const hasMatchingUser =
         Boolean(user) &&
@@ -89,12 +88,9 @@ export default async function Order({ params, searchParams }: PageProps) {
             normalizedOrderEmail === normalizedUserEmail))
 
       const hasMatchingAccessToken =
-        Boolean(accessToken) &&
-        Boolean(orderResult.accessToken) &&
-        accessToken === orderResult.accessToken &&
-        (!normalizedOrderEmail ||
-          !normalizedQueryEmail ||
-          normalizedOrderEmail === normalizedQueryEmail)
+        Boolean(accessClaims) &&
+        accessClaims?.orderID === String(orderResult.id) &&
+        accessClaims?.email === normalizedOrderEmail
 
       if (hasMatchingUser || hasMatchingAccessToken) {
         order = orderResult
@@ -285,6 +281,7 @@ export default async function Order({ params, searchParams }: PageProps) {
                     <div className="space-y-3">
                       {(delivery.units || []).map((unit: any, unitIndex: number) => (
                         <DeliveryUnitCard
+                          accessToken={accessToken}
                           key={`${unit.unitCode || 'unit'}-${unitIndex}`}
                           unit={unit}
                         />

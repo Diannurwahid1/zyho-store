@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import type { Transporter } from 'nodemailer'
 import type { Payload } from 'payload'
 
 // ─── ENV Config ──────────────────────────────────────────────────
@@ -32,7 +33,7 @@ const getSender = (context: EmailContext) => {
 }
 
 // ─── Transporter (lazy singleton) ────────────────────────────────
-let _transporter: nodemailer.Transporter | null = null
+let _transporter: Transporter | null = null
 
 const getTransporter = () => {
   if (_transporter) return _transporter

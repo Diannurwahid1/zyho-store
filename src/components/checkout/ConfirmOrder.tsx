@@ -43,14 +43,10 @@ export const ConfirmOrder: React.FC = () => {
 
             if (result && typeof result === 'object' && 'orderID' in result && result.orderID) {
               const nextURL = new URL(`/orders/${result.orderID}`, window.location.origin)
-              if ('accessToken' in result && result.accessToken) {
-                nextURL.searchParams.set('accessToken', String(result.accessToken))
-              }
 
               console.log('[ConfirmOrder] Setting successResult:', {
                 orderID: result.orderID,
                 pointsEarned: result.pointsEarned || 0,
-                accessToken: result.accessToken,
                 nextURL: `${nextURL.pathname}${nextURL.search}`,
               })
 
@@ -58,7 +54,6 @@ export const ConfirmOrder: React.FC = () => {
               setSuccessResult({
                 orderID: result.orderID,
                 pointsEarned: result.pointsEarned || 0,
-                accessToken: result.accessToken,
                 nextURL: `${nextURL.pathname}${nextURL.search}`,
               })
             } else {
