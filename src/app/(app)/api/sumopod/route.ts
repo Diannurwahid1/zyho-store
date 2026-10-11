@@ -25,6 +25,10 @@ const SUMOPOD_API_BASE_URL =
 const SUMOPOD_PAYMENT_METHOD = process.env.SUMOPOD_PAYMENT_METHOD || 'QRIS'
 const MAX_PROVIDER_RESPONSE_BYTES = 256 * 1024
 const MAX_REQUEST_BODY_BYTES = 16 * 1024
+const TRUSTED_SUMOPOD_CHECKOUT_HOSTS = new Set([
+  'sumopod.com',
+  'checkout.pymnt.app',
+])
 
 const QRIS_FIELD_NAMES = new Set([
   'payment_number',
@@ -68,7 +72,8 @@ const isTrustedSumoPodURL = (value: unknown): value is string => {
     const url = new URL(value)
     return (
       url.protocol === 'https:' &&
-      (url.hostname === 'sumopod.com' || url.hostname.endsWith('.sumopod.com'))
+      (TRUSTED_SUMOPOD_CHECKOUT_HOSTS.has(url.hostname) ||
+        url.hostname.endsWith('.sumopod.com'))
     )
   } catch {
     return false
