@@ -80,6 +80,34 @@ const isTrustedSumoPodURL = (value: unknown): value is string => {
   }
 }
 
+const matchesSumoPodAmount = ({
+  expectedAmount,
+  payment,
+}: {
+  expectedAmount: number
+  payment: Record<string, unknown>
+}) => {
+  if (payment.amount === undefined) return true
+
+  const totalAmount = Number(payment.amount)
+  if (!Number.isFinite(totalAmount)) return false
+  if (totalAmount === expectedAmount) return true
+
+  // SumoPod may pass its fee to the customer. In that mode, net_amount is the
+  // merchant's requested amount and amount is the total shown to the customer.
+  if (payment.net_amount === undefined || payment.fee === undefined) return false
+
+  const netAmount = Number(payment.net_amount)
+  const fee = Number(payment.fee)
+  return (
+    Number.isFinite(netAmount) &&
+    Number.isFinite(fee) &&
+    fee >= 0 &&
+    netAmount === expectedAmount &&
+    totalAmount === netAmount + fee
+  )
+}
+
 const normalizeSumoPodPayment = (payment: Record<string, any>) => {
   const rawQrisPayload =
     findStringByKey(payment, QRIS_FIELD_NAMES) ||
@@ -368,7 +396,7 @@ export async function POST(req: NextRequest) {
     if (
       !isTrustedSumoPodURL(data.payment_link_url) ||
       (data.order_id && String(data.order_id) !== orderID) ||
-      (data.amount !== undefined && Number(data.amount) !== amount) ||
+      !matchesSumoPodAmount({ expectedAmount: amount, payment: data }) ||
       (data.currency && String(data.currency).toUpperCase() !== 'IDR')
     ) {
       await resetCreateClaim()
