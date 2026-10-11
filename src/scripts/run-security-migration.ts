@@ -17,7 +17,9 @@ const main = async () => {
     await db.transaction(async (transaction) => {
       // Older production databases predate this long-standing Users field.
       await transaction.execute(sql`
-        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "google_avatar_u_r_l" varchar
+        ALTER TABLE "users"
+          ADD COLUMN IF NOT EXISTS "google_avatar_u_r_l" varchar,
+          ADD COLUMN IF NOT EXISTS "reset_password_requested_at" timestamp(3) with time zone
       `)
 
       const existing = await transaction.execute(sql`
