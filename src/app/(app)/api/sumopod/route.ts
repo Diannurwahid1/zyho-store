@@ -388,9 +388,14 @@ export async function POST(req: NextRequest) {
     }
     if (!response.ok) {
       await resetCreateClaim()
+      const providerMessage = String(data.message || data.error || '').slice(0, 500)
+      payload.logger.warn(
+        { orderID, providerMessage, providerStatus: response.status },
+        '[SumoPod] payment link request rejected',
+      )
       return NextResponse.json(
-        { error: data.message || data.error || 'Gagal membuat pembayaran SumoPod.' },
-        { status: response.status >= 400 && response.status < 500 ? 502 : response.status },
+        { error: providerMessage || 'Gagal membuat pembayaran SumoPod.' },
+        { status: 502 },
       )
     }
     if (

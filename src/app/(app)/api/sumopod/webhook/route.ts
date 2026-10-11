@@ -28,11 +28,35 @@ type SumoPodEvent = {
   data?: {
     amount?: number
     currency?: string
+    fee?: number
+    net_amount?: number
     order_id?: string
     payment_id?: string
     status?: string
   }
   event_type?: string
+}
+
+const matchesSumoPodAmount = ({
+  expectedAmount,
+  payment,
+}: {
+  expectedAmount: number
+  payment: NonNullable<SumoPodEvent['data']>
+}) => {
+  const totalAmount = Number(payment.amount)
+  if (!Number.isInteger(totalAmount)) return false
+  if (totalAmount === expectedAmount) return true
+
+  const netAmount = Number(payment.net_amount)
+  const fee = Number(payment.fee)
+  return (
+    Number.isInteger(netAmount) &&
+    Number.isInteger(fee) &&
+    fee >= 0 &&
+    netAmount === expectedAmount &&
+    totalAmount === netAmount + fee
+  )
 }
 
 const safeEqual = (leftValue: string, rightValue: string) => {
@@ -223,12 +247,11 @@ export async function POST(req: NextRequest) {
 
     let nextStatus: 'completed' | 'expired' | 'failed'
     if (eventType === 'payment.completed') {
-      const amount = Number(event.data?.amount)
       const currency = String(event.data?.currency || 'IDR').toUpperCase()
       if (
         event.data?.status !== 'completed' ||
-        !Number.isInteger(amount) ||
-        amount !== Number(attempt.expectedAmount) ||
+        !event.data ||
+        !matchesSumoPodAmount({ expectedAmount: Number(attempt.expectedAmount), payment: event.data }) ||
         currency !== 'IDR'
       ) {
         throw new Error('Nominal, currency, atau status webhook tidak cocok.')
