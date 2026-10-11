@@ -15,6 +15,11 @@ const main = async () => {
 
   try {
     await db.transaction(async (transaction) => {
+      // Older production databases predate this long-standing Users field.
+      await transaction.execute(sql`
+        ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "google_avatar_url" varchar
+      `)
+
       const existing = await transaction.execute(sql`
         SELECT 1 FROM "payload_migrations" WHERE "name" = ${migrationName} LIMIT 1
       `)
