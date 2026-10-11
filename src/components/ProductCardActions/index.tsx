@@ -1,6 +1,7 @@
 'use client'
 
 import { WaitlistDialog } from '@/components/WaitlistDialog'
+import { useProductAvailability } from '@/components/ProductAvailability'
 import { useActiveCheckout } from '@/hooks/useActiveCheckout'
 import { useCart } from '@payloadcms/plugin-ecommerce/client/react'
 import { useRouter } from 'next/navigation'
@@ -33,6 +34,7 @@ export function ProductCardActions({
   const { hasActiveCheckout, isChecking: isCheckingCheckout } = useActiveCheckout()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const liveAvailability = useProductAvailability(productId)
 
   const selectedVariant = useMemo(() => {
     if (!enableVariants) return undefined
@@ -52,8 +54,12 @@ export function ProductCardActions({
       return selectedVariant?.inventory ?? 0
     }
 
+    if (liveAvailability) {
+      return liveAvailability.available
+    }
+
     return inventory ?? 0
-  }, [enableVariants, inventory, selectedVariant?.inventory])
+  }, [enableVariants, inventory, liveAvailability, selectedVariant?.inventory])
 
   const existingQuantity = useMemo(() => {
     const existingItem = cart?.items?.find((item) => {

@@ -3,6 +3,10 @@
 import { DiscountedPrice } from '@/components/DiscountedPrice'
 import { ProductArtwork } from '@/components/product/ProductArtwork'
 import { ProductCardActions } from '@/components/ProductCardActions'
+import {
+  ProductAvailabilityProvider,
+  ProductStockBadge,
+} from '@/components/ProductAvailability'
 import { cn } from '@/utilities/cn'
 import { getProductBadgeLabel } from '@/utilities/productBadge'
 import { useCurrency } from '@payloadcms/plugin-ecommerce/client/react'
@@ -122,16 +126,22 @@ export const ProductShowcase: React.FC<ProductShowcaseProps> = ({
         <div className="mb-5 flex gap-3 overflow-x-auto pb-2 md:mb-8 md:grid md:grid-cols-2 md:gap-4 md:overflow-visible lg:grid-cols-3">
           {displayProducts.map((product) => {
             const badgeLabel = getProductBadgeLabel(product)
+            const isOutOfStock = (product.inventory ?? 0) <= 0
 
             return (
-              <article
+              <ProductAvailabilityProvider
+                initialAvailable={product.inventory ?? 0}
                 key={product.id}
-                className="group relative h-[254px] w-[164px] shrink-0 overflow-hidden rounded-xl border border-border bg-gradient-to-br from-card to-muted transition-all duration-300 hover:border-foreground/30 md:h-auto md:w-auto"
+                productId={product.id}
               >
-                {(product.inventory ?? 0) <= 0 ? (
-                  <span className="absolute left-2 top-2 z-10 rounded-full bg-red-600 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-white md:left-3 md:top-3 md:text-[10px]">
+                <article className="group relative h-[254px] w-[164px] shrink-0 overflow-hidden rounded-xl border border-border bg-gradient-to-br from-card to-muted transition-all duration-300 hover:border-foreground/30 md:h-auto md:w-auto">
+                {isOutOfStock ? (
+                  <ProductStockBadge
+                    className="absolute left-2 top-2 z-10 rounded-full bg-red-600 px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-white md:left-3 md:top-3 md:text-[10px]"
+                    initialOutOfStock={isOutOfStock}
+                  >
                     {isIndonesian ? 'Habis Terjual' : 'Out of Stock'}
-                  </span>
+                  </ProductStockBadge>
                 ) : badgeLabel ? (
                   <span className="absolute left-2 top-2 z-10 rounded-full bg-foreground px-2 py-1 text-[9px] font-medium uppercase tracking-wide text-background md:left-3 md:top-3 md:text-[10px]">
                     {badgeLabel}
@@ -185,7 +195,8 @@ export const ProductShowcase: React.FC<ProductShowcaseProps> = ({
                     variants={product.variants}
                   />
                 </div>
-              </article>
+                </article>
+              </ProductAvailabilityProvider>
             )
           })}
         </div>

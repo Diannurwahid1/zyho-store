@@ -3,6 +3,10 @@ import type { Product } from '@/payload-types'
 import { DiscountedPrice } from '@/components/DiscountedPrice'
 import { ProductArtwork } from '@/components/product/ProductArtwork'
 import { ProductCardActions } from '@/components/ProductCardActions'
+import {
+  ProductAvailabilityProvider,
+  ProductStockBadge,
+} from '@/components/ProductAvailability'
 import type { Media as MediaType } from '@/payload-types'
 import { isBundleProduct } from '@/lib/bundles'
 import { getProductArtworkImages } from '@/lib/productArtwork'
@@ -52,12 +56,16 @@ export const ProductGridItem: React.FC<Props> = ({ product }) => {
   const artworkImages = getProductArtworkImages(product as any, 4)
 
   return (
-    <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl md:rounded-3xl">
+    <ProductAvailabilityProvider initialAvailable={product.inventory ?? 0} productId={product.id || 0}>
+      <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl md:rounded-3xl">
       <div className="relative m-1.5 overflow-hidden rounded-xl bg-muted md:m-3 md:rounded-2xl">
         {isOutOfStock ? (
-          <span className="absolute left-1.5 top-1.5 z-10 rounded-full bg-red-600 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-white md:left-4 md:top-4 md:px-3 md:py-1 md:text-xs">
+          <ProductStockBadge
+            className="absolute left-1.5 top-1.5 z-10 rounded-full bg-red-600 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-white md:left-4 md:top-4 md:px-3 md:py-1 md:text-xs"
+            initialOutOfStock={isOutOfStock}
+          >
             Habis Terjual
-          </span>
+          </ProductStockBadge>
         ) : badgeLabel ? (
           <span className="absolute left-1.5 top-1.5 z-10 rounded-full bg-foreground px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-wide text-background md:left-4 md:top-4 md:px-3 md:py-1 md:text-xs">
             {badgeLabel}
@@ -132,6 +140,7 @@ export const ProductGridItem: React.FC<Props> = ({ product }) => {
           />
         </div>
       </div>
-    </article>
+      </article>
+    </ProductAvailabilityProvider>
   )
 }
