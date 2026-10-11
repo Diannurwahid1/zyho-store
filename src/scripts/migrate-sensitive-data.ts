@@ -50,7 +50,8 @@ const main = async () => {
   }
 
   payload.logger.info({ migrated }, '[Security] Sensitive digital stock migration completed')
-  await payload.destroy()
+  // Payload leaves background handles open in one-off scripts on some hosts.
+  process.exit(0)
 }
 
 main().catch((error) => {

@@ -65,7 +65,8 @@ const main = async () => {
     { protectedDigitalFiles: protectedMediaIDs.size, supportFiles: supportMedia.docs.length },
     '[Security] Private media migration completed',
   )
-  await payload.destroy()
+  // Payload leaves background handles open in one-off scripts on some hosts.
+  process.exit(0)
 }
 
 main().catch((error) => {
